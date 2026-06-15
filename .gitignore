@@ -1,0 +1,17 @@
+# Entorno virtual de Python (cada uno lo crea en su máquina)
+venv/
+__pycache__/
+*.pyc
+
+# Claves privadas de Supabase - NUNCA subir esto
+.streamlit/secrets.toml
+
+# Archivos temporales y de trabajo interno
+update_js.py
+weird.txt
+home_html.txt
+
+# Archivos de sistema de Windows y macOS
+.DS_Store
+Thumbs.db
+desktop.ini

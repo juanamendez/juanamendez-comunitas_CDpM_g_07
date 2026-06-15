@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMUNITAS - Plataforma Comunitaria</title>
+    <meta name="description" content="Encontrá recursos comunitarios de forma rápida, clara e intuitiva. Servicios de comedores, duchas, atención médica, apoyo escolar, ropa y alojamiento.">
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+</head>
+<body>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+        
+        <!-- Fixed Left Sidebar -->
+        <aside class="sidebar" id="main-sidebar">
+            <div class="sidebar-header">
+                <img src="assets/logo_comunitas.png" alt="COMUNITAS Logo" id="brand-logo" class="brand-logo">
+            </div>
+            
+            <nav class="sidebar-nav">
+                <!-- 1. Menú Principal -->
+                <button class="nav-btn active" data-target="home" id="btn-home">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <span>Menú Principal</span>
+                </button>
+                
+                <!-- 2. Servicios -->
+                <button class="nav-btn" data-target="services" id="btn-services">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+                            <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+                            <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+                        </svg>
+                    </div>
+                    <span>Servicios</span>
+                </button>
+                
+                <!-- 3. Mapa -->
+                <button class="nav-btn" data-target="map" id="btn-map">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                            <line x1="8" y1="2" x2="8" y2="18"></line>
+                            <line x1="16" y1="6" x2="16" y2="22"></line>
+                        </svg>
+                    </div>
+                    <span>Mapa</span>
+                </button>
+                
+                <!-- 4. Agregar Organización -->
+                <button class="nav-btn" data-target="add-org" id="btn-add-org">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            <line x1="12" y1="11" x2="12" y2="17"></line>
+                            <line x1="9" y1="14" x2="15" y2="14"></line>
+                        </svg>
+                    </div>
+                    <span>Agregar Organización</span>
+                </button>
+                
+                <!-- 5. Mi Organización -->
+                <button class="nav-btn" data-target="my-org" id="btn-my-org">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </div>
+                    <span>Mi Organización</span>
+                </button>
+                
+                <!-- 6. Perfil -->
+                <button class="nav-btn" data-target="profile" id="btn-profile">
+                    <div class="nav-icon-wrapper">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <span>Perfil</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <span class="app-version">v1.0.0</span>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content" id="main-content">
+            
+            <!-- Decorative Circles in Top Right Corner -->
+            <div class="decorative-circles" aria-hidden="true">
+                <div class="circle circle-1"></div>
+                <div class="circle circle-2"></div>
+                <div class="circle circle-3"></div>
+                <div class="circle circle-4"></div>
+            </div>
+
+            <header class="content-header">
+                <!-- Hamburger menu for mobile screen responsiveness -->
+                <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menú">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+            </header>
+            
+            <div class="content-body" id="screen-container">
+                
+                <!-- ==================== SCREEN: MENÚ PRINCIPAL ==================== -->
+                <section class="screen-section active" id="screen-home">
+                    <!-- Welcome Section -->
+                    <div class="welcome-banner">
+                        <div class="welcome-text-wrapper">
+                            <h1 class="welcome-title">Bienvenido a COMUNITAS</h1>
+                            <p class="welcome-subtitle">Encontrá recursos comunitarios cerca tuyo de forma rápida y sencilla.</p>
+                        </div>
+                        
+                        <!-- Description Banner Card -->
+                        <div class="brand-description-card">
+                            <div class="description-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <p class="welcome-description">
+                                <strong>COMUNITAS</strong> reúne información sobre organizaciones y servicios comunitarios para facilitar el acceso a recursos esenciales como comida, duchas, atención médica, apoyo escolar y alojamiento.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Organizations Section -->
+                    <div class="recommendations-container">
+                        <h2 class="section-title">Organizaciones recomendadas</h2>
+                        
+
+                            <!-- Card 4: Fundación Abrigo -->
+                            <article class="org-card">
+                                <div class="org-card-header">
+                                    <div class="service-badge category-education">
+                                        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                        </svg>
+                                        <span>Alojamiento</span>
+                                    </div>
+                                    <span class="status-badge open">Activo</span>
+                                </div>
+                                <div class="org-card-body">
+                                    <div class="org-illustration-circle circle-education">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="card-center-icon">
+                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                            <path d="M12 17s-3-2-3-3.67A1.67 1.67 0 0 1 10.67 11.5c.78 0 1.33.6 1.33.6s.55-.6 1.33-.6a1.67 1.67 0 0 1 1.67 1.83C15 15 12 17 12 17z" fill="currentColor"></path>
+                                        </svg>
+                                    </div>
+                                    <h3 class="org-name">Fundación Abrigo</h3>
+                                    <div class="org-rating" aria-label="Calificación 4.5 estrellas de 64 opiniones">
+                                        <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                        </svg>
+                                        <span class="rating-value">4.5</span>
+                                        <span class="rating-count">(64 reseñas)</span>
+                                    </div>
+                                    <p class="org-description">Alojamiento seguro y contención para personas en situación de calle.</p>
+                                </div>
+                                <div class="org-card-footer">
+                                    <button class="details-btn">Ver detalles</button>
+                                </div>
+                            </article>
+
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: SERVICIOS ==================== -->
+                <section class="screen-section" id="screen-services">
+                    <!-- Welcome Section -->
+                    <div class="welcome-banner">
+                        <div class="welcome-text-wrapper">
+                            <h1 class="welcome-title">Servicios</h1>
+                            <p class="welcome-subtitle">Elegí el tipo de ayuda que necesitás encontrar.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="services-grid">
+                        <!-- Card 1: Duchas -->
+                        <article class="service-card" data-service="Duchas">
+                            <div class="service-card-icon-wrapper circle-duchas">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M7 4h5a6 6 0 0 1 6 6v1"></path>
+                                    <path d="M15 11h6v2h-6zM16 16v.01M18 16v.01M20 16v.01"></path>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Duchas</h3>
+                            <p class="service-card-desc">Espacios de higiene disponibles.</p>
+                        </article>
+                        
+                        <!-- Card 2: Comida -->
+                        <article class="service-card" data-service="Comida">
+                            <div class="service-card-icon-wrapper circle-comida">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Comida</h3>
+                            <p class="service-card-desc">Comedores y merenderos.</p>
+                        </article>
+                        
+                        <!-- Card 3: Atención médica -->
+                        <article class="service-card" data-service="Atención médica">
+                            <div class="service-card-icon-wrapper circle-salud">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Atención médica</h3>
+                            <p class="service-card-desc">Asistencia básica de salud.</p>
+                        </article>
+                        
+                        <!-- Card 4: Apoyo escolar -->
+                        <article class="service-card" data-service="Apoyo escolar">
+                            <div class="service-card-icon-wrapper circle-apoyo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Apoyo escolar</h3>
+                            <p class="service-card-desc">Acompañamiento educativo.</p>
+                        </article>
+                        
+                        <!-- Card 5: Ropa -->
+                        <article class="service-card" data-service="Ropa">
+                            <div class="service-card-icon-wrapper circle-clothing">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M2 17l10-10 10 10Z"></path>
+                                    <path d="M12 7a3 3 0 1 0-3-3"></path>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Ropa</h3>
+                            <p class="service-card-desc">Entrega de ropa y abrigo.</p>
+                        </article>
+                        
+                        <!-- Card 6: Alojamiento -->
+                        <article class="service-card" data-service="Alojamiento">
+                            <div class="service-card-icon-wrapper circle-alojamiento">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="category-card-icon">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                </svg>
+                            </div>
+                            <h3 class="service-card-title">Alojamiento</h3>
+                            <p class="service-card-desc">Espacios para dormir o descansar.</p>
+                        </article>
+                    </div>
+                </section>
+                
+                <!-- ==================== SCREEN: DETAIL PLACEHOLDER ==================== -->
+                <section class="screen-section" id="screen-service-placeholder">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-services">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver a Servicios</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title" id="placeholder-service-name">Servicio</h1>
+                            <p class="welcome-subtitle">Organizaciones que ofrecen este servicio.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Compact Horizontal Filter Bar (Screen 2.1) -->
+                    <div class="suggest-container" style="margin-top: 1.5rem; width: 100%; max-width: 100%;">
+                        <div class="suggest-form-card" style="padding: 1rem 1.5rem; margin-bottom: 1.5rem; border-radius: 16px;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; width: 100%;">
+                                <!-- Estado -->
+                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label class="form-label" for="filter-service-status" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Estado ▼</label>
+                                    <select class="form-input" id="filter-service-status" style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
+                                        <option value="All">Todos</option>
+                                        <option value="Activo">Activo</option>
+                                        <option value="Suspendido">Suspendido</option>
+                                        <option value="Cupo completo">Cupo completo</option>
+                                        <option value="Inactivo">Inactivo</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Calificación -->
+                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label class="form-label" for="filter-service-rating" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Calificación ▼</label>
+                                    <select class="form-input" id="filter-service-rating" style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
+                                        <option value="All">Todas</option>
+                                        <option value="3">3+ estrellas</option>
+                                        <option value="4">4+ estrellas</option>
+                                        <option value="4.5">4.5+ estrellas</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Horario -->
+                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label class="form-label" for="filter-service-schedule" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Horario ▼</label>
+                                    <select class="form-input" id="filter-service-schedule" style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
+                                        <option value="All">Todos</option>
+                                        <option value="now">Disponible ahora</option>
+                                        <option value="morning">Mañana</option>
+                                        <option value="afternoon">Tarde</option>
+                                        <option value="night">Noche</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Distancia -->
+                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label class="form-label" for="filter-service-distance" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Distancia ▼</label>
+                                    <select class="form-input" id="filter-service-distance" disabled style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
+                                        <option value="All">Todas</option>
+                                        <option value="1">Menos de 1 km</option>
+                                        <option value="5">Menos de 5 km</option>
+                                        <option value="15">Menos de 15 km</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Geoloc Button -->
+                                <div style="min-width: 160px; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <button class="eval-secondary-btn" id="btn-service-use-location" style="margin: 0; height: 38px; padding: 0 0.75rem; font-size: 0.85rem; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 0.35rem; font-weight: 700;">
+                                        <span>📍 Usar mi ubicación</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Buttons row -->
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; justify-content: flex-end;">
+                                <button class="eval-submit-btn" id="btn-service-apply-filters" style="width: auto; padding: 0 1.25rem; height: 36px; font-size: 0.85rem; border-radius: 8px; margin: 0; font-weight: 700; display: flex; align-items: center; justify-content: center;">Aplicar filtros</button>
+                                <button class="eval-secondary-btn" id="btn-service-clear-filters" style="width: auto; padding: 0 1.25rem; height: 36px; font-size: 0.85rem; border-radius: 8px; margin: 0; font-weight: 700; display: flex; align-items: center; justify-content: center;">Limpiar filtros</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vertical List of Organization Cards (Screen 2.1) -->
+                    <div class="org-list-container" id="org-list-container">
+                        <!-- Populated dynamically in app.js -->
+                    </div>
+                </section>
+                
+                <!-- ==================== SCREEN: DETALLE DE ORGANIZACIÓN ==================== -->
+                <section class="screen-section" id="screen-org-detail">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-list">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver al listado</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Detail View Grid (Screen 2.2) -->
+                    <div class="detail-grid" id="org-detail-content">
+                        <!-- Populated dynamically in app.js -->
+                    </div>
+                </section>
+                
+                <!-- ==================== SCREEN: EVALUAR ORGANIZACIÓN ==================== -->
+                <section class="screen-section" id="screen-org-evaluate">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-detail">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver al detalle</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Evaluar organización</h1>
+                            <p class="welcome-subtitle">Compartí tu experiencia para ayudar a otras personas.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Evaluation View Container (Screen 2.3) -->
+                    <div class="evaluate-container" id="org-evaluate-content">
+                        <!-- Populated dynamically in app.js -->
+                    </div>
+                </section>
+                
+                <!-- ==================== SCREEN: MAPA ==================== -->
+                <section class="screen-section" id="screen-map">
+                    <div class="welcome-banner">
+                        <h1 class="welcome-title">Mapa</h1>
+                        <p class="welcome-subtitle">Ubicación geográfica de los recursos y servicios comunitarios.</p>
+                    </div>
+                    
+                    <!-- Map Dashboard Grid -->
+                    <div class="map-dashboard">
+                        
+                        <!-- 1. Left Filter Panel -->
+                        <aside class="map-filter-panel">
+                            <h2 class="filter-panel-title">Filtros</h2>
+                            
+                            <div class="filter-group">
+                                <h3 class="filter-group-title">Servicio</h3>
+                                <div class="filter-options">
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="all" id="service-all">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Todos</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Duchas">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Duchas</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Comida">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Comida</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Atención médica">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Atención médica</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Apoyo escolar">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Apoyo escolar</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Ropa">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Ropa</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="service" value="Alojamiento">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Alojamiento</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <h3 class="filter-group-title">Estado</h3>
+                                <div class="filter-options">
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="status" value="all" id="status-all">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Todos</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="status" value="Activo">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Activo</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="status" value="Suspendido">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Suspendido</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="status" value="Cupo completo">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Cupo completo</span>
+                                    </label>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" name="status" value="Inactivo">
+                                        <span class="custom-checkbox"></span>
+                                        <span class="filter-label-text">Inactivo</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <h3 class="filter-group-title">Calificación</h3>
+                                <div class="filter-options">
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="rating" value="all" checked>
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">Todas</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="rating" value="3">
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">3+ estrellas</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="rating" value="4">
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">4+ estrellas</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="rating" value="4.5">
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">4.5+ estrellas</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="filter-group">
+                                <h3 class="filter-group-title" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span>Distancia</span>
+                                    <button class="eval-secondary-btn" id="btn-use-location" style="margin: 0; padding: 0.2rem 0.5rem; font-size: 0.75rem; width: auto; height: auto; border-radius: 8px;">
+                                        Usar mi ubicación
+                                    </button>
+                                </h3>
+                                <div class="filter-options">
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="distance" value="all" checked disabled>
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">Todas</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="distance" value="1" disabled>
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">Menos de 1 km</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="distance" value="5" disabled>
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">Menos de 5 km</span>
+                                    </label>
+                                    <label class="filter-radio-label">
+                                        <input type="radio" name="distance" value="15" disabled>
+                                        <span class="custom-radio"></span>
+                                        <span class="filter-label-text">Menos de 15 km</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <h3 class="filter-group-title">Favoritos</h3>
+                                <label class="filter-toggle-label">
+                                    <input type="checkbox" name="favorites-only" id="filter-favorites">
+                                    <span class="custom-toggle"></span>
+                                    <span class="filter-label-text">Mostrar solo favoritos</span>
+                                </label>
+                            </div>
+
+                            
+                            <!-- Filter Actions Buttons -->
+                            <div class="filter-actions" style="display:flex; flex-direction:column; gap:1rem; margin-top:1.5rem;">
+                                <button class="eval-submit-btn" id="btn-apply-filters" style="font-size: 1.05rem; padding: 0.85rem;">Aplicar filtros</button>
+                                <button class="eval-secondary-btn" id="btn-clear-filters" style="font-size: 1rem; padding: 0.75rem;">Limpiar filtros</button>
+                            </div>
+                        </aside>
+                        
+                        <!-- 2. Main Map Area -->
+                        <div class="map-view-area" id="map-view-container">
+                            <div id="map" style="width: 100%; height: 100%; z-index: 5;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: AGREGAR ORGANIZACIÓN (4.1) ==================== -->
+                <section class="screen-section" id="screen-add-org">
+                    <div class="welcome-banner">
+                        <h1 class="welcome-title">Agregar Organización</h1>
+                        <p class="welcome-subtitle">Ayudanos a ampliar la red de recursos comunitarios.</p>
+                    </div>
+                    
+                    <div class="add-org-grid">
+                        <!-- Card 1: Sugerir nueva organización -->
+                        <article class="add-org-card" id="card-suggest-org">
+                            <div class="add-org-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 38px; height: 38px;">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                    <line x1="12" y1="11" x2="12" y2="17"></line>
+                                    <line x1="9" y1="14" x2="15" y2="14"></line>
+                                </svg>
+                            </div>
+                            <h2 class="add-org-card-title">Sugerir nueva organización</h2>
+                            <p class="add-org-card-desc">Conocés una organización que todavía no está en COMUNITAS? Completá una solicitud para que pueda ser revisada.</p>
+                            <button class="add-org-card-btn" id="btn-add-org-submit">Agregar organización</button>
+                        </article>
+                        
+                        <!-- Card 2: Ver solicitudes anteriores -->
+                        <article class="add-org-card" id="card-view-requests">
+                            <div class="add-org-icon-wrapper history-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 38px; height: 38px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                            </div>
+                            <h2 class="add-org-card-title">Ver solicitudes anteriores</h2>
+                            <p class="add-org-card-desc">Consultá el estado de las organizaciones que sugeriste anteriormente.</p>
+                            <button class="add-org-card-btn secondary-btn" id="btn-view-org-requests">Ver solicitudes</button>
+                        </article>
+
+                        <!-- Card 3: Revisar solicitudes pendientes (Admin) -->
+                        <article class="add-org-card" id="card-admin-requests" style="display: none;">
+                            <div class="add-org-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 38px; height: 38px;">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                </svg>
+                            </div>
+                            <h2 class="add-org-card-title">Revisar solicitudes pendientes</h2>
+                            <p class="add-org-card-desc">Revisá organizaciones sugeridas por colaboradores y aprobá o rechazá su publicación.</p>
+                            <button class="add-org-card-btn" id="btn-admin-requests">Revisar solicitudes</button>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: SUGERIR ORGANIZACIÓN (4.2) ==================== -->
+                <section class="screen-section" id="screen-suggest-org">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-add-org">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Sugerir nueva organización</h1>
+                            <p class="welcome-subtitle">Completá los datos que conozcas. La solicitud será revisada antes de publicarse.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="suggest-container">
+                        <div class="suggest-form-card" id="suggest-form-card-container">
+                            <!-- Section 1: Datos básicos -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Datos básicos</h3>
+                                <div class="form-group">
+                                    <label class="form-label" for="suggest-name">Nombre de la organización *</label>
+                                    <input type="text" class="form-input" id="suggest-name" placeholder="Ej: Comedor Rayito de Sol">
+                                </div>
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label class="form-label" for="suggest-desc">Descripción</label>
+                                    <textarea class="form-textarea" id="suggest-desc" placeholder="Contanos brevemente qué hace la organización…"></textarea>
+                                </div>
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label class="form-label" for="suggest-address">Dirección</label>
+                                    <input type="text" class="form-input" id="suggest-address" placeholder="Ej: Av. Rivadavia 1234, CABA">
+                                </div>
+                                <div class="form-row" style="margin-top: 1rem;">
+                                    <div class="form-group">
+                                        <label class="form-label" for="suggest-phone">Teléfono</label>
+                                        <input type="text" class="form-input" id="suggest-phone" placeholder="Ej: +54 11 1234-5678">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="suggest-social">Redes sociales</label>
+                                        <input type="text" class="form-input" id="suggest-social" placeholder="Ej: @comedorrayito">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Section 2: Servicios que ofrece -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Servicios que ofrece</h3>
+                                <div class="services-pills-grid">
+                                    <span class="service-pill" data-service="Comida">Comida</span>
+                                    <span class="service-pill" data-service="Duchas">Duchas</span>
+                                    <span class="service-pill" data-service="Atención médica">Atención médica</span>
+                                    <span class="service-pill" data-service="Apoyo escolar">Apoyo escolar</span>
+                                    <span class="service-pill" data-service="Ropa">Ropa</span>
+                                    <span class="service-pill" data-service="Alojamiento">Alojamiento</span>
+                                    <span class="service-pill" data-service="Asesoramiento legal">Asesoramiento legal</span>
+                                    <span class="service-pill" data-service="Asesoramiento laboral">Asesoramiento laboral</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Section 3: Horarios -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Horarios</h3>
+                                <div class="form-group">
+                                    <label class="form-label">¿Conocés los horarios?</label>
+                                    <div class="radio-options-group">
+                                        <label class="filter-radio-label">
+                                            <input type="radio" name="suggest-schedule-known" value="no" checked>
+                                            <span class="custom-radio"></span>
+                                            <span class="filter-label-text">No</span>
+                                        </label>
+                                        <label class="filter-radio-label">
+                                            <input type="radio" name="suggest-schedule-known" value="yes">
+                                            <span class="custom-radio"></span>
+                                            <span class="filter-label-text">Sí</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group" id="suggest-schedule-container" style="display: none; margin-top: 1rem;">
+                                    <label class="form-label" for="suggest-schedule">Escribí los horarios conocidos</label>
+                                    <textarea class="form-textarea" id="suggest-schedule" placeholder="Ej: Lunes a Viernes de 12:00 a 14:00 hs…"></textarea>
+                                </div>
+                            </div>
+                            
+                            <!-- Section 4: Ubicación -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Ubicación</h3>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label" for="suggest-lat">Latitud (opcional)</label>
+                                        <input type="text" class="form-input" id="suggest-lat" placeholder="Ej: -34.603">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="suggest-lng">Longitud (opcional)</label>
+                                        <input type="text" class="form-input" id="suggest-lng" placeholder="Ej: -58.381">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Section 5: Actions -->
+                            <div class="form-actions-row">
+                                <button class="eval-submit-btn" id="btn-submit-suggest">Enviar solicitud</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-suggest">Volver</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: SOLICITUDES ANTERIORES (4.3) ==================== -->
+                <section class="screen-section" id="screen-org-requests">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-add-org-from-requests">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Solicitudes anteriores</h1>
+                            <p class="welcome-subtitle">Consultá el estado de las organizaciones que sugeriste.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="requests-list-container">
+                        <!-- Card 1: Comedor Nuevo Horizonte -->
+                        <article class="request-list-card">
+                            <div class="request-card-info">
+                                <div class="request-card-header">
+                                    <h3 class="request-card-name">Comedor Nuevo Horizonte</h3>
+                                    <span class="status-badge-custom pending">Pendiente</span>
+                                </div>
+                                <p class="request-card-desc">Comedor barrial para familias vulnerables.</p>
+                                <div class="request-card-meta">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="meta-icon" style="width:16px; height:16px; color:var(--text-muted);">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    <span>Fecha de envío: 08/06/2026</span>
+                                </div>
+                            </div>
+                            <div class="request-card-action">
+                                <button class="request-card-btn btn-view-request" data-id="1" data-name="Comedor Nuevo Horizonte">Ver solicitud</button>
+                            </div>
+                        </article>
+                        
+                        <!-- Card 2: Centro Comunitario Santa Clara -->
+                        <article class="request-list-card">
+                            <div class="request-card-info">
+                                <div class="request-card-header">
+                                    <h3 class="request-card-name">Centro Comunitario Santa Clara</h3>
+                                    <span class="status-badge-custom approved">Aprobada</span>
+                                </div>
+                                <p class="request-card-desc">Espacio comunitario con apoyo escolar y merienda.</p>
+                                <div class="request-card-meta">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="meta-icon" style="width:16px; height:16px; color:var(--text-muted);">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    <span>Fecha de envío: 25/05/2026</span>
+                                </div>
+                            </div>
+                            <div class="request-card-action">
+                                <button class="request-card-btn btn-view-request" data-id="2" data-name="Centro Comunitario Santa Clara">Ver solicitud</button>
+                            </div>
+                        </article>
+
+                        <!-- Card 3: Fundación Manos Abiertas -->
+                        <article class="request-list-card">
+                            <div class="request-card-info">
+                                <div class="request-card-header">
+                                    <h3 class="request-card-name">Fundación Manos Abiertas</h3>
+                                    <span class="status-badge-custom rejected">Rechazada</span>
+                                </div>
+                                <p class="request-card-desc">Organización que ofrece ropa y acompañamiento social.</p>
+                                <div class="request-card-meta">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="meta-icon" style="width:16px; height:16px; color:var(--text-muted);">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    <span>Fecha de envío: 10/05/2026</span>
+                                </div>
+                            </div>
+                            <div class="request-card-action">
+                                <button class="request-card-btn btn-view-request" data-id="3" data-name="Fundación Manos Abiertas">Ver solicitud</button>
+                            </div>
+                        </article>
+                    </div>
+
+                    <!-- Bottom Back Button -->
+                    <div style="margin-top: 2.5rem; max-width: 200px;">
+                        <button class="eval-secondary-btn" id="btn-cancel-view-org-requests">Volver</button>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: DETALLE DE SOLICITUD (4.4) ==================== -->
+                <section class="screen-section" id="screen-request-detail">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-requests-from-detail">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Detalle de solicitud</h1>
+                            <p class="welcome-subtitle">Información enviada para revisión.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="suggest-container">
+                        <div class="suggest-form-card">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f5ede6; padding-bottom: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <h2 id="detail-req-title" style="font-size: 1.8rem; font-weight: 700; color: var(--brand-charcoal); margin: 0 0 0.5rem 0;"></h2>
+                                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                                        <span class="status-badge-custom" id="detail-req-badge"></span>
+                                        <span id="detail-req-date" style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600;"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Basic Info Section -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Datos básicos</h3>
+                                <div style="display: grid; grid-template-columns: 1fr; gap: 1.25rem;">
+                                    <div>
+                                        <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Nombre de la organización</label>
+                                        <div id="detail-req-name" style="font-size: 1.1rem; color: var(--brand-charcoal); font-weight: 600; margin-top: 0.25rem;"></div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Descripción</label>
+                                        <div id="detail-req-desc" style="font-size: 1.1rem; color: var(--brand-charcoal); line-height: 1.5; margin-top: 0.25rem;"></div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Dirección</label>
+                                        <div id="detail-req-address" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div>
+                                            <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Teléfono</label>
+                                            <div id="detail-req-phone" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                                        </div>
+                                        <div>
+                                            <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Redes sociales</label>
+                                            <div id="detail-req-social" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Services Section -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Servicios ofrecidos</h3>
+                                <div id="detail-req-services" class="services-pills-grid">
+                                    <!-- Injected pills -->
+                                </div>
+                            </div>
+
+                            <!-- Schedule Section -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Horarios</h3>
+                                <div id="detail-req-schedule" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                            </div>
+
+                            <!-- Location Section -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Ubicación</h3>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Latitud</label>
+                                        <div id="detail-req-lat" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label" style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Longitud</label>
+                                        <div id="detail-req-lng" style="font-size: 1.1rem; color: var(--brand-charcoal); margin-top: 0.25rem;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Review Status Section -->
+                            <div class="form-group">
+                                <h3 class="form-section-title">Estado de revisión</h3>
+                                <div id="detail-req-review-block" style="padding: 1.25rem; border-radius: 12px; border-left: 4px solid #f59e0b; background-color: rgba(245, 158, 11, 0.08); transition: all 0.3s ease;">
+                                    <div id="detail-req-review-text" style="font-size: 1.05rem; line-height: 1.5; color: var(--brand-charcoal);"></div>
+                                </div>
+                            </div>
+
+                            <!-- Back Action Button -->
+                            <div style="margin-top: 1rem; border-top: 2px solid #f5ede6; padding-top: 1.5rem;">
+                                <button class="eval-secondary-btn" id="btn-back-to-requests-from-card" style="margin-top: 0; width: auto; min-width: 200px;">Volver a solicitudes</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: SOLICITUDES PENDIENTES (4.5) ==================== -->
+                <section class="screen-section" id="screen-admin-requests">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-from-admin-requests">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver a agregar organización</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Solicitudes pendientes</h1>
+                            <p class="welcome-subtitle">Aprobá o rechazá las nuevas organizaciones sugeridas.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="requests-list" id="admin-requests-list" style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 2rem; max-width: 800px;">
+                        <!-- Mock Pending Request Card -->
+                        <article class="request-card" style="background: var(--bg-card); border-radius: 24px; padding: 2rem; border: 1px solid rgba(76, 67, 61, 0.05); box-shadow: var(--box-shadow);">
+                            <div class="request-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h3 class="request-org-name" style="margin: 0; font-size: 1.4rem; color: var(--brand-charcoal);">Hogar San Martín</h3>
+                                    <p class="request-desc" style="margin: 0.5rem 0 0; color: var(--text-muted); font-size: 1rem; line-height: 1.5;">Centro de día para personas mayores, ofrece viandas y apoyo psicológico.</p>
+                                </div>
+                                <span class="status-badge pending" style="background-color: rgba(207, 94, 40, 0.1); color: var(--brand-rust); font-weight: 600; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem;">Pendiente</span>
+                            </div>
+                            <div class="request-meta" style="display: flex; gap: 1.5rem; margin-top: 1.25rem; font-size: 0.9rem; color: var(--text-muted);">
+                                <span><strong>Por:</strong> Carlos Méndez</span>
+                                <span><strong>Fecha:</strong> 12/05/2026</span>
+                            </div>
+                            <button class="eval-secondary-btn btn-view-admin-request" style="margin-top: 1.5rem; width: 100%; border-color: rgba(76, 67, 61, 0.1);">Ver detalle</button>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: REVISIÓN DE SOLICITUD (4.6) ==================== -->
+                <section class="screen-section" id="screen-admin-review">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-from-admin-review">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver a solicitudes</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Revisión de solicitud</h1>
+                            <p class="welcome-subtitle">Detalles completos de la organización sugerida.</p>
+                        </div>
+                    </div>
+
+                    <div class="suggest-container" style="margin-top: 2rem;">
+                        <div class="suggest-form-card" style="padding: 2.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid rgba(76, 67, 61, 0.05);">
+                                <div>
+                                    <span style="font-size: 0.9rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">Enviado por: Carlos Méndez el 12/05/2026</span>
+                                    <h2 style="font-size: 1.8rem; color: var(--brand-charcoal); margin: 0;">Hogar San Martín</h2>
+                                </div>
+                                <span class="status-badge pending" style="background-color: rgba(207, 94, 40, 0.1); color: var(--brand-rust); font-weight: 600; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem;">Pendiente</span>
+                            </div>
+
+                            <div style="margin-bottom: 2rem;">
+                                <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem; font-size: 1.1rem;">Descripción</strong>
+                                <p style="color: var(--text-muted); margin: 0; line-height: 1.6; font-size: 1.05rem;">Centro de día para personas mayores, ofrece viandas y apoyo psicológico.</p>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; margin-bottom: 2.5rem;">
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Dirección</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">Av. San Martín 1234</p>
+                                </div>
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Teléfono</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">11-5555-4444</p>
+                                </div>
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Servicios Ofrecidos</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">Comida, Atención médica</p>
+                                </div>
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Horario</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">Lunes a Viernes 09:00 a 17:00</p>
+                                </div>
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Redes Sociales</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">@hogarsanmartin</p>
+                                </div>
+                                <div>
+                                    <strong style="display: block; color: var(--brand-charcoal); margin-bottom: 0.5rem;">Coordenadas</strong>
+                                    <p style="color: var(--text-muted); margin: 0; line-height: 1.5;">Lat: -34.610, Lng: -58.442</p>
+                                </div>
+                            </div>
+
+                            <div class="form-actions-row" style="margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid rgba(76, 67, 61, 0.05);">
+                                <button class="eval-submit-btn" id="btn-admin-approve">Aprobar organización</button>
+                                <button class="eval-secondary-btn" id="btn-admin-reject" style="color: #d32f2f; border-color: #d32f2f; background: transparent;">Rechazar solicitud</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: MI ORGANIZACIÓN (5.1) ==================== -->
+                <section class="screen-section" id="screen-my-org">
+                    <div class="welcome-banner">
+                        <div class="welcome-text-wrapper">
+                            <h1 class="welcome-title">Mi Organización</h1>
+                            <p class="welcome-subtitle">Administrá la información de tu organización.</p>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Grid Container -->
+                    <div class="my-org-dashboard">
+                        
+                        <!-- 1. Organization Header Card (Full Width) -->
+                        <div class="my-org-card full-width">
+                            <div class="my-org-header-main">
+                                <div class="my-org-logo-placeholder">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px; color:var(--brand-rust);">
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="my-org-header-info">
+                                    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                                        <h2 class="my-org-name-title" id="my-org-header-name">Parroquia San José</h2>
+                                        <span class="status-badge-custom approved" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Activa</span>
+                                        <span style="font-size:1.05rem; color:var(--brand-mustard); font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;">⭐ 4.8</span>
+                                    </div>
+                                    <p class="my-org-description-text" id="my-org-header-desc">
+                                        Organización comunitaria que ofrece duchas, ropa limpia y acompañamiento para personas en situación de vulnerabilidad.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Grid for cards 2 to 6 -->
+                        <div class="my-org-grid">
+                            
+                            <!-- Left Column -->
+                            <div class="my-org-col">
+                                <!-- 2. Información general Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                        <h3>Información general</h3>
+                                    </div>
+                                    <div class="my-org-info-list">
+                                        <div class="info-item">
+                                            <span class="info-label">Dirección</span>
+                                            <span class="info-val" id="my-org-info-address">Av. San Martín 1234, Buenos Aires</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Teléfono</span>
+                                            <span class="info-val" id="my-org-info-phone">11 2345-6789</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Instagram</span>
+                                            <span class="info-val" id="my-org-info-instagram">@parroquiasanjose</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Sitio web</span>
+                                            <span class="info-val"><a href="https://www.parroquiasanjose.org" target="_blank" style="color: var(--brand-rust); text-decoration: none; font-weight: 600;" id="my-org-info-website">www.parroquiasanjose.org</a></span>
+                                        </div>
+                                        <div class="info-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem; border-top:1px solid #f5ede6; padding-top:0.75rem;">
+                                            <div class="info-item" style="margin:0;">
+                                                <span class="info-label">Latitud</span>
+                                                <span class="info-val" id="my-org-info-lat">-34.603722</span>
+                                            </div>
+                                            <div class="info-item" style="margin:0;">
+                                                <span class="info-label">Longitud</span>
+                                                <span class="info-val" id="my-org-info-lng">-58.381592</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-edit-my-org-info">Editar información</button>
+                                </div>
+
+                                <!-- 5. Fotos Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        <h3>Fotos</h3>
+                                    </div>
+                                    <div class="my-org-photos-preview" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.75rem; margin:0.25rem 0;">
+                                        <!-- Photo placeholder 1 -->
+                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #f5ede6 0%, #e2d3c5 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                <polyline points="21 15 16 10 5 21"></polyline>
+                                            </svg>
+                                        </div>
+                                        <!-- Photo placeholder 2 -->
+                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #fcefe9 0%, #f7dcd0 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                <polyline points="21 15 16 10 5 21"></polyline>
+                                            </svg>
+                                        </div>
+                                        <!-- Photo placeholder 3 -->
+                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #fdf2e4 0%, #fadfb9 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                <polyline points="21 15 16 10 5 21"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-photos" style="margin-top: 1rem;">Administrar fotos</button>
+                                </div>
+
+                            </div>
+                            
+                            <!-- Right Column -->
+                            <div class="my-org-col">
+                                <!-- 3. Servicios Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                        </svg>
+                                        <h3>Servicios</h3>
+                                    </div>
+                                    <div class="my-org-services-list" id="my-org-services-list" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0;">
+                                        <span class="service-pill selected" style="cursor:default; margin:0;">Duchas</span>
+                                        <span class="service-pill selected" style="cursor:default; margin:0;">Ropa</span>
+                                        <span class="service-pill selected" style="cursor:default; margin:0;">Comida</span>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-services" style="margin-top: 1rem;">Administrar servicios</button>
+                                </div>
+
+                                <!-- 4. Necesidades actuales Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                                        </svg>
+                                        <h3>Necesidades actuales</h3>
+                                    </div>
+                                    <div class="my-org-needs-list" id="my-org-needs-list" style="display:flex; flex-direction:column; gap:0.75rem; margin:0.5rem 0;">
+                                        <div style="display:flex; align-items:center; gap:0.6rem; font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">
+                                            <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                            Toallas
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:0.6rem; font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">
+                                            <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                            Jabón
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:0.6rem; font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">
+                                            <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                            Ropa de abrigo
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:0.6rem; font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">
+                                            <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                            Voluntarios
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-needs" style="margin-top: 1rem;">Administrar necesidades</button>
+                                </div>
+
+                                <!-- 6. Miembros Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="9" cy="7" r="4"></circle>
+                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                        </svg>
+                                        <h3>Miembros</h3>
+                                    </div>
+                                    <div class="my-org-members-list" id="my-org-members-list" style="display:flex; flex-direction:column; gap:0.75rem; margin:0.5rem 0;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">María García</span>
+                                            <span style="font-size:0.8rem; font-weight:700; color:var(--brand-rust); background-color:#fcefe9; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Administradora</span>
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">Juan Pérez</span>
+                                            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); background-color:#f5ede6; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Editor</span>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-members" style="margin-top: 1rem;">Administrar miembros</button>
+                                </div>
+                            </div>
+                            
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: EDITAR INFORMACIÓN GENERAL (5.2) ==================== -->
+                <section class="screen-section" id="screen-edit-my-org">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-my-org-from-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Editar información general</h1>
+                            <p class="welcome-subtitle">Actualizá los datos principales de tu organización.</p>
+                        </div>
+                    </div>
+
+                    <div class="suggest-container">
+                        <div class="suggest-form-card" id="edit-my-org-form-container">
+                            <div class="form-group">
+                                <label class="form-label" for="edit-my-org-name">Nombre de la organización</label>
+                                <input type="text" class="form-input" id="edit-my-org-name" value="Parroquia San José">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="edit-my-org-desc">Descripción</label>
+                                <textarea class="form-textarea" id="edit-my-org-desc">Organización comunitaria que ofrece duchas, ropa limpia y acompañamiento para personas en situación de vulnerabilidad.</textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="edit-my-org-address">Dirección</label>
+                                <input type="text" class="form-input" id="edit-my-org-address" value="Av. San Martín 1234, Buenos Aires">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-my-org-phone">Teléfono</label>
+                                    <input type="text" class="form-input" id="edit-my-org-phone" value="11 2345-6789">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-my-org-instagram">Instagram</label>
+                                    <input type="text" class="form-input" id="edit-my-org-instagram" value="@parroquiasanjose">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="edit-my-org-website">Sitio web</label>
+                                <input type="text" class="form-input" id="edit-my-org-website" value="www.parroquiasanjose.org">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-my-org-lat">Latitud</label>
+                                    <input type="text" class="form-input" id="edit-my-org-lat" value="-34.603722">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-my-org-lng">Longitud</label>
+                                    <input type="text" class="form-input" id="edit-my-org-lng" value="-58.381592">
+                                </div>
+                            </div>
+
+                            <div class="form-actions-row">
+                                <button class="eval-submit-btn" id="btn-save-edit-my-org">Guardar cambios</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-edit-my-org">Volver</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: ADMINISTRAR SERVICIOS (5.3) ==================== -->
+                <section class="screen-section" id="screen-manage-services">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-my-org-from-services-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Administrar servicios</h1>
+                            <p class="welcome-subtitle">Agregá, editá o eliminá los servicios que ofrece tu organización.</p>
+                        </div>
+                    </div>
+
+                    <!-- 1. Current Services List View -->
+                    <div id="services-list-view" style="width: 100%;">
+                        <!-- Actions Row -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-submit-btn" id="btn-add-service" style="width: auto; padding-left: 2rem; padding-right: 2rem;">Agregar servicio</button>
+                            <button class="eval-secondary-btn" id="btn-back-to-my-org-from-services-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver</button>
+                        </div>
+
+                        <!-- Services Grid list -->
+                        <div class="manage-services-list" id="services-cards-grid">
+                            <!-- Cards will be dynamically injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 2. Add/Edit Service Form View (Hidden by default) -->
+                    <div id="service-form-view" style="display: none; width: 100%;">
+                        <div class="suggest-container" style="margin-top: 0;">
+                            <div class="welcome-banner" style="margin-bottom: 1.5rem;">
+                                <h2 class="welcome-title" id="service-form-title" style="font-size: 1.8rem; margin: 0; color: var(--brand-charcoal);">Agregar servicio</h2>
+                            </div>
+
+                            <div class="suggest-form-card" id="service-form-card-container">
+                                <div class="form-group">
+                                    <label class="form-label" for="service-form-type">Tipo de servicio</label>
+                                    <select class="form-input" id="service-form-type" style="padding: 0 0.75rem;">
+                                        <option value="Comida">Comida</option>
+                                        <option value="Duchas">Duchas</option>
+                                        <option value="Atención médica">Atención médica</option>
+                                        <option value="Apoyo escolar">Apoyo escolar</option>
+                                        <option value="Ropa">Ropa</option>
+                                        <option value="Alojamiento">Alojamiento</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="service-form-name">Título del servicio</label>
+                                    <input type="text" class="form-input" id="service-form-name" placeholder="Ej: Duchas comunitarias…">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="service-form-desc">Descripción</label>
+                                    <textarea class="form-textarea" id="service-form-desc" placeholder="Ej: Acceso a duchas y elementos básicos de higiene…"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="service-form-schedule">Horario</label>
+                                    <input type="text" class="form-input" id="service-form-schedule" placeholder="Ej: Lunes a viernes de 9:00 a 12:00…">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="service-form-status">Estado</label>
+                                    <select class="form-input" id="service-form-status" style="padding: 0 0.75rem;">
+                                        <option value="active-status">Activo</option>
+                                        <option value="suspended-status">Suspendido</option>
+                                        <option value="full-status">Cupo completo</option>
+                                        <option value="inactive-status">Inactivo</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-actions-row">
+                                    <button class="eval-submit-btn" id="btn-save-service">Guardar servicio</button>
+                                    <button class="eval-secondary-btn" id="btn-cancel-service">Cancelar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: ADMINISTRAR NECESIDADES (5.4) ==================== -->
+                <section class="screen-section" id="screen-manage-needs">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-my-org-from-needs-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Administrar necesidades</h1>
+                            <p class="welcome-subtitle">Publicá y actualizá las necesidades actuales de tu organización.</p>
+                        </div>
+                    </div>
+
+                    <!-- 1. Current Needs List View -->
+                    <div id="needs-list-view" style="width: 100%;">
+                        <!-- Actions Row -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-submit-btn" id="btn-add-need" style="width: auto; padding-left: 2rem; padding-right: 2rem;">Nueva necesidad</button>
+                            <button class="eval-secondary-btn" id="btn-back-to-my-org-from-needs-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver</button>
+                        </div>
+
+                        <!-- Needs Grid list -->
+                        <div class="manage-services-list" id="needs-cards-grid">
+                            <!-- Cards will be dynamically injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 2. Add/Edit Need Form View (Hidden by default) -->
+                    <div id="need-form-view" style="display: none; width: 100%;">
+                        <div class="suggest-container" style="margin-top: 0;">
+                            <div class="welcome-banner" style="margin-bottom: 1.5rem;">
+                                <h2 class="welcome-title" id="need-form-title" style="font-size: 1.8rem; margin: 0; color: var(--brand-charcoal);">Nueva necesidad</h2>
+                            </div>
+
+                            <div class="suggest-form-card" id="need-form-card-container">
+                                <div class="form-group">
+                                    <label class="form-label" for="need-form-name">Título</label>
+                                    <input type="text" class="form-input" id="need-form-name" placeholder="Ej: Jabón, Toallas, Alimentos…">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="need-form-desc">Descripción</label>
+                                    <textarea class="form-textarea" id="need-form-desc" placeholder="Ej: Se necesitan toallas limpias para el servicio de duchas…"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="need-form-category">Categoría</label>
+                                    <select class="form-input" id="need-form-category" style="padding: 0 0.75rem;">
+                                        <option value="Higiene">Higiene</option>
+                                        <option value="Ropa">Ropa</option>
+                                        <option value="Voluntariado">Voluntariado</option>
+                                        <option value="Alimentos">Alimentos</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="need-form-priority">Prioridad</label>
+                                    <select class="form-input" id="need-form-priority" style="padding: 0 0.75rem;">
+                                        <option value="low">Baja</option>
+                                        <option value="medium">Media</option>
+                                        <option value="high">Alta</option>
+                                        <option value="urgent">Urgente</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="need-form-status">Estado</label>
+                                    <select class="form-input" id="need-form-status" style="padding: 0 0.75rem;">
+                                        <option value="active-status">Activa</option>
+                                        <option value="inactive-status">Inactiva</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-actions-row">
+                                    <button class="eval-submit-btn" id="btn-save-need">Guardar necesidad</button>
+                                    <button class="eval-secondary-btn" id="btn-cancel-need">Cancelar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: ADMINISTRAR FOTOS (5.5) ==================== -->
+                <section class="screen-section" id="screen-manage-photos">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-my-org-from-photos-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Administrar fotos</h1>
+                            <p class="welcome-subtitle">Subí, revisá o eliminá fotos de tu organización.</p>
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <!-- Actions Row -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-submit-btn" id="btn-upload-photo-header" style="width: auto; padding-left: 2rem; padding-right: 2rem;">Subir foto</button>
+                            <button class="eval-secondary-btn" id="btn-back-to-my-org-from-photos-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver</button>
+                        </div>
+
+                        <!-- Upload Card -->
+                        <div class="photo-upload-card" id="btn-select-file-card">
+                            <div class="upload-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <h3 class="upload-title-text">Arrastrá una imagen o seleccioná un archivo</h3>
+                            <span class="upload-subtitle-text">Formatos permitidos: JPG, PNG</span>
+                            <button class="eval-submit-btn" id="btn-select-file" style="width: auto; padding-left: 1.5rem; padding-right: 1.5rem; margin-top: 0.5rem;">Seleccionar archivo</button>
+                        </div>
+
+                        <!-- Current Photos Gallery -->
+                        <div style="margin-top: 3rem;">
+                            <h2 class="section-title" style="font-size: 1.5rem; margin-bottom: 1rem;">Fotos actuales</h2>
+                            
+                            <div class="photos-gallery-grid" id="photos-gallery-container">
+                                <!-- Card 1 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #f5ede6 0%, #e2d3c5 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+
+                                <!-- Card 2 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #fcefe9 0%, #f7dcd0 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+
+                                <!-- Card 3 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #fdf2e4 0%, #fadfb9 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+
+                                <!-- Card 4 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #f4eef7 0%, #e2d2ed 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+
+                                <!-- Card 5 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+
+                                <!-- Card 6 -->
+                                <article class="photo-gallery-card">
+                                    <div class="gallery-image-placeholder" style="background: linear-gradient(135deg, #e8f4fd 0%, #bbdefb 100%);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div class="photo-label-row">
+                                        <span class="photo-card-label">Foto de la organización</span>
+                                        <button class="btn-delete-photo">Eliminar</button>
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: AGREGAR FOTO (5.5.1) ==================== -->
+                <section class="screen-section" id="screen-add-photo">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-photos-from-add-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Agregar foto</h1>
+                            <p class="welcome-subtitle">Subí una imagen para mostrar mejor tu organización.</p>
+                        </div>
+                    </div>
+
+                    <div class="suggest-container" style="margin-top: 0; width: 100%; max-width: 720px;">
+                        <div class="suggest-form-card" id="add-photo-form-card-container">
+                            <!-- 1. Upload Area -->
+                            <div class="form-group">
+                                <label class="form-label">Archivo de imagen</label>
+                                <div class="photo-upload-card" id="btn-select-file-add-card" style="padding: 2.5rem 1.5rem; margin-bottom: 0.5rem;">
+                                    <div class="upload-icon-wrapper" style="width: 48px; height: 48px;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px;">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                    </div>
+                                    <h3 class="upload-title-text" style="font-size: 1.15rem;">Arrastrá una imagen acá</h3>
+                                    <span class="upload-subtitle-text" style="font-size: 0.9rem; margin: -0.5rem 0 0.25rem 0;">o seleccioná un archivo desde tu computadora</span>
+                                    <button class="eval-submit-btn" id="btn-select-file-add" style="width: auto; padding-left: 1.25rem; padding-right: 1.25rem; margin-top: 0.25rem; font-size: 0.95rem;">Seleccionar archivo</button>
+                                </div>
+                                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Formatos permitidos: JPG, PNG. Tamaño máximo recomendado: 5 MB.</span>
+                            </div>
+
+                            <!-- 3. Optional Description Field -->
+                            <div class="form-group">
+                                <label class="form-label" for="add-photo-description">Descripción de la foto</label>
+                                <input type="text" class="form-input" id="add-photo-description" placeholder="Ejemplo: Entrada principal, comedor, sala de apoyo escolar…">
+                            </div>
+
+                            <!-- 4. Preview Area -->
+                            <div class="form-group">
+                                <label class="form-label">Vista previa</label>
+                                <div class="gallery-image-placeholder" id="add-photo-preview-placeholder" style="aspect-ratio: 1.77; border-radius: 16px; background: #fbf8f3; border: 2px dashed rgba(76, 67, 61, 0.1); width: 100%; display: flex; align-items: center; justify-content: center; color: rgba(76, 67, 61, 0.35);">
+                                    <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">Sin imagen seleccionada</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 5. Actions -->
+                            <div class="form-actions-row">
+                                <button class="eval-submit-btn" id="btn-save-photo">Guardar foto</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-add-photo">Volver</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                </section>
+
+                <!-- ==================== SCREEN: ARCHIVO SELECCIONADO (5.5.2) ==================== -->
+                <section class="screen-section" id="screen-photo-selected">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-add-from-selected-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Seleccionar archivo</h1>
+                            <p class="welcome-subtitle">Elegí una imagen para subir a la organización.</p>
+                        </div>
+                    </div>
+
+                    <div class="suggest-container" style="margin-top: 0; width: 100%; max-width: 720px;">
+                        <div class="suggest-form-card" id="photo-selected-card-container">
+                            <!-- 1. File Selector Area -->
+                            <div class="form-group">
+                                <label class="form-label" for="real-file-input" style="cursor: pointer;">Seleccionar archivo</label>
+                                <input type="file" id="real-file-input" accept="image/png, image/jpeg" style="display: none;">
+                                <button type="button" class="eval-secondary-btn" id="btn-trigger-file-select" style="margin-top: 0; width: auto; align-self: flex-start; padding: 0.75rem 1.5rem;">Seleccionar archivo</button>
+                            </div>
+
+                            <!-- 2. File Information (Conditional) -->
+                            <div class="form-group" id="selected-file-info-container" style="display: none;">
+                                <label class="form-label">Detalles del archivo</label>
+                                <div class="request-list-card" style="padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; border-color: rgba(76, 67, 61, 0.1); margin-top: 0.25rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--brand-rust); flex-shrink: 0;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        <div style="display: flex; flex-direction: column;">
+                                            <span id="selected-file-name" style="font-weight: 700; color: var(--brand-charcoal); font-size: 1.05rem; word-break: break-all;">-</span>
+                                            <span id="selected-file-size" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">-</span>
+                                        </div>
+                                    </div>
+                                    <span class="status-badge-custom active-status" style="font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; flex-shrink: 0;">Archivo cargado</span>
+                                </div>
+                            </div>
+
+                            <!-- 3. Preview Area -->
+                            <div class="form-group">
+                                <label class="form-label">Vista previa</label>
+                                <div class="gallery-image-placeholder" id="selected-photo-preview-box" style="aspect-ratio: 1.77; border-radius: 16px; background: #fbf8f3; border: 2px dashed rgba(76, 67, 61, 0.1); width: 100%; display: flex; align-items: center; justify-content: center; color: rgba(76, 67, 61, 0.35); overflow: hidden; position: relative;">
+                                    <div id="preview-placeholder-text" style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; opacity: 0.85;">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">Sin imagen seleccionada</span>
+                                    </div>
+                                    <img id="preview-image-element" style="display: none; width: 100%; height: 100%; object-fit: cover;" alt="Vista previa">
+                                </div>
+                            </div>
+
+                            <!-- 4. Description Field -->
+                            <div class="form-group">
+                                <label class="form-label" for="selected-photo-description">Descripción de la foto</label>
+                                <input type="text" class="form-input" id="selected-photo-description" placeholder="Ejemplo: Entrada principal, comedor, sala de apoyo escolar…">
+                            </div>
+
+                            <!-- 5. Actions -->
+                            <div class="form-actions-row">
+                                <button class="eval-submit-btn" id="btn-save-selected-photo" disabled>Guardar foto</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-selected-photo">Volver</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: ADMINISTRAR MIEMBROS (5.6) ==================== -->
+                <section class="screen-section" id="screen-manage-members">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-my-org-from-members-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Administrar miembros</h1>
+                            <p class="welcome-subtitle">Gestioná las personas que pueden administrar esta organización.</p>
+                        </div>
+                    </div>
+
+                    <!-- 1. Current Members List View -->
+                    <div id="members-list-view" style="width: 100%;">
+                        <!-- Actions Row -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-submit-btn" id="btn-add-member" style="width: auto; padding-left: 2rem; padding-right: 2rem;">Agregar miembro</button>
+                            <button class="eval-secondary-btn" id="btn-back-to-my-org-from-members-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver</button>
+                        </div>
+
+                        <!-- Members list -->
+                        <div class="manage-services-list" id="members-cards-grid">
+                            <!-- Cards will be dynamically injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 2. Add/Edit Member Form View (Hidden by default) -->
+                    <div id="member-form-view" style="display: none; width: 100%;">
+                        <div class="suggest-container" style="margin-top: 0; max-width: 720px;">
+                            <div class="welcome-banner" style="margin-bottom: 1.5rem;">
+                                <h2 class="welcome-title" id="member-form-title" style="font-size: 1.8rem; margin: 0; color: var(--brand-charcoal);">Agregar miembro</h2>
+                            </div>
+
+                            <div class="suggest-form-card" id="member-form-card-container">
+                                <!-- 1. Search Section -->
+                                <div id="member-search-section" class="form-group" style="display: flex; flex-direction: row; gap: 0.75rem; align-items: flex-end;">
+                                    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.6rem;">
+                                        <label class="form-label" for="member-form-email">Email del usuario</label>
+                                        <input type="email" class="form-input" id="member-form-email" placeholder="Ej: nombre@correo.com">
+                                    </div>
+                                    <button type="button" class="eval-secondary-btn" id="btn-search-user" style="margin-top: 0; height: 48px; width: auto; padding-left: 1.5rem; padding-right: 1.5rem; font-size: 1rem;">Buscar usuario</button>
+                                </div>
+
+                                <!-- 2. User Not Found Section -->
+                                <div id="member-not-found-section" style="display: none; padding: 1rem 1.25rem; border-radius: 12px; background-color: #fbeeef; border: 1.5px solid rgba(166, 75, 88, 0.15); color: #a64b58; font-weight: 600; font-size: 1.05rem;">
+                                    Este usuario todavía no está registrado en COMUNITAS.
+                                </div>
+
+                                <!-- 3. User Found Section -->
+                                <div id="member-found-section" style="display: none; flex-direction: column; gap: 1.5rem;">
+                                    <!-- Result Card -->
+                                    <div class="request-list-card" style="padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; border-color: rgba(76, 67, 61, 0.1); margin-top: 0.25rem;">
+                                        <div style="display: flex; align-items: center; gap: 1rem;">
+                                            <div class="upload-icon-wrapper" style="width: 48px; height: 48px; flex-shrink: 0; background-color: #fcefe9; color: var(--brand-rust);">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px;">
+                                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                    <circle cx="12" cy="7" r="4"></circle>
+                                                </svg>
+                                            </div>
+                                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                                <span id="member-found-name" style="font-weight: 700; color: var(--brand-charcoal); font-size: 1.15rem; line-height: 1.2;">-</span>
+                                                <span id="member-found-email-display" style="font-size: 0.95rem; color: var(--text-muted); font-weight: 600;">-</span>
+                                            </div>
+                                        </div>
+                                        <span class="status-badge-custom active-status" style="font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem;">Usuario registrado</span>
+                                    </div>
+
+                                    <!-- Member Configurations -->
+                                    <div class="form-group">
+                                        <label class="form-label" for="member-form-role">Rol dentro de la organización</label>
+                                        <select class="form-input" id="member-form-role" style="padding: 0 0.75rem;">
+                                            <option value="Administradora">Administradora</option>
+                                            <option value="Editor">Editor</option>
+                                            <option value="Colaboradora">Colaboradora</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label" for="member-form-status">Estado</label>
+                                        <select class="form-input" id="member-form-status" style="padding: 0 0.75rem;">
+                                            <option value="Activa">Activa</option>
+                                            <option value="Inactiva">Inactiva</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- 4. Form Actions -->
+                                <div class="form-actions-row">
+                                    <button class="eval-submit-btn" id="btn-save-member" style="display: none;">Guardar miembro</button>
+                                    <button class="eval-secondary-btn" id="btn-cancel-member" style="margin-top: 0;">Cancelar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: MI PERFIL (6.1) ==================== -->
+                <section class="screen-section" id="screen-profile">
+                    <div class="welcome-banner">
+                        <div class="welcome-text-wrapper">
+                            <h1 class="welcome-title">Mi Perfil</h1>
+                            <p class="welcome-subtitle">Gestioná tus datos, favoritos, reseñas y sugerencias.</p>
+                        </div>
+                    </div>
+
+                    <!-- Profile Dashboard Grid Container -->
+                    <div class="my-org-dashboard">
+                        
+                        <!-- 1. Profile Header Card (Full Width) -->
+                        <div class="my-org-card full-width">
+                            <div class="my-org-header-main" style="justify-content: space-between; flex-wrap: wrap; width: 100%;">
+                                <div style="display: flex; gap: 2rem; align-items: center; flex-wrap: wrap;">
+                                    <div class="my-org-header-info">
+                                        <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                                            <h2 class="my-org-name-title" id="profile-user-name">Juan Pérez</h2>
+                                            <span class="status-badge-custom active-status" style="font-size:0.8rem; font-weight: 700; padding:0.25rem 0.65rem; background-color: #fef5e7; color: var(--brand-mustard); border-radius: 20px; text-transform: uppercase;">Colaborador</span>
+                                        </div>
+                                        <p class="my-org-description-text" id="profile-user-email" style="font-size: 1.05rem; font-weight: 600;">juan@example.com</p>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.95rem; font-weight: 500; margin-top: 0.25rem;">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; color: var(--brand-rust);">
+                                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                                            </svg>
+                                            <span>Miembro desde: 01/06/2026</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="eval-secondary-btn" id="btn-edit-profile" style="margin-top: 0; width: auto; height: fit-content; padding: 0.75rem 1.5rem;">Editar perfil</button>
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Grid for cards 2 to 4 -->
+                        <div class="my-org-grid">
+                            
+                            <!-- Left Column -->
+                            <div class="my-org-col">
+                                <!-- 2. Favoritos Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                        </svg>
+                                        <h3>Favoritos</h3>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:0.8rem; margin:0.25rem 0;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
+                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                                Parroquia San José
+                                            </span>
+                                            <div style="display:flex; gap:0.5rem;">
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Duchas">
+                                                    <div class="service-card-icon-wrapper circle-duchas" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M7 4h5a6 6 0 0 1 6 6v1"></path><path d="M15 11h6v2h-6zM16 16v.01M18 16v.01M20 16v.01"></path></svg>
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Ropa">
+                                                    <div class="service-card-icon-wrapper circle-clothing" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 17l10-10 10 10Z"></path><path d="M12 7a3 3 0 1 0-3-3"></path></svg>
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
+                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
+                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                                Comedor Esperanza
+                                            </span>
+                                            <div style="display:flex; gap:0.5rem;">
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
+                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Ropa">
+                                                    <div class="service-card-icon-wrapper circle-clothing" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 17l10-10 10 10Z"></path><path d="M12 7a3 3 0 1 0-3-3"></path></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
+                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                                Centro Comunitario Norte
+                                            </span>
+                                            <div style="display:flex; gap:0.5rem;">
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Apoyo escolar">
+                                                    <div class="service-card-icon-wrapper circle-apoyo" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
+                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-view-favorites">Ver favoritos</button>
+                                </div>
+
+                                <!-- 4. Mis sugerencias Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                        </svg>
+                                        <h3>Mis sugerencias</h3>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:0.8rem; margin:0.25rem 0;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
+                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                                Comedor Nuevo Horizonte
+                                            </span>
+                                            <span class="status-badge-custom pending" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Pendiente</span>
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
+                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
+                                                Centro Comunitario Santa Clara
+                                            </span>
+                                            <span class="status-badge-custom approved" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Aprobada</span>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-view-suggestions">Ver sugerencias</button>
+                                </div>
+                            </div>
+
+                            <!-- Right Column -->
+                            <div class="my-org-col">
+                                <!-- 3. Mis reseñas Card -->
+                                <div class="my-org-card">
+                                    <div class="my-org-card-title-row">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                        </svg>
+                                        <h3>Mis reseñas</h3>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:1rem; margin:0.25rem 0;">
+                                        <div style="border-bottom:1px solid #f5ede6; padding-bottom:0.8rem; display:flex; flex-direction:column; gap:0.4rem;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                <span style="font-weight:700; color:var(--brand-charcoal); font-size:1.05rem;">Parroquia San José</span>
+                                                <span style="color:var(--brand-mustard); font-weight:700; font-size:1rem; display:flex; align-items:center; gap:0.25rem;">
+                                                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px; height:16px; color: var(--brand-mustard);">
+                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                    </svg>
+                                                    5
+                                                </span>
+                                            </div>
+                                            <p style="font-size:0.95rem; color:var(--text-muted); font-style:italic; font-weight:500; margin:0;">
+                                                “Muy buen trato.”
+                                            </p>
+                                        </div>
+                                        <div style="padding-bottom:0.2rem; display:flex; flex-direction:column; gap:0.4rem;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                <span style="font-weight:700; color:var(--brand-charcoal); font-size:1.05rem;">Comedor Esperanza</span>
+                                                <span style="color:var(--brand-mustard); font-weight:700; font-size:1rem; display:flex; align-items:center; gap:0.25rem;">
+                                                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px; height:16px; color: var(--brand-mustard);">
+                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                    </svg>
+                                                    4
+                                                </span>
+                                            </div>
+                                            <p style="font-size:0.95rem; color:var(--text-muted); font-style:italic; font-weight:500; margin:0;">
+                                                “Comida abundante.”
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-view-reviews">Ver reseñas</button>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: EDITAR PERFIL (6.2) ==================== -->
+                <section class="screen-section" id="screen-edit-profile">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-profile-from-edit-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Editar perfil</h1>
+                            <p class="welcome-subtitle">Actualizá tu información personal.</p>
+                        </div>
+                    </div>
+
+                    <div class="suggest-container" style="margin-top: 0; width: 100%; max-width: 720px;">
+                        <div class="suggest-form-card" id="edit-profile-form-container">
+                            <!-- 1. Información personal -->
+                            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                                <h3 class="form-section-title" style="font-size: 1.2rem; font-weight: 700; color: var(--brand-charcoal); border: none; margin: 0; padding: 0;">Información personal</h3>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label" for="edit-profile-name">Nombre</label>
+                                        <input type="text" class="form-input" id="edit-profile-name" value="Juan">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="edit-profile-lastname">Apellido</label>
+                                        <input type="text" class="form-input" id="edit-profile-lastname" value="Pérez">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-profile-email">Email</label>
+                                    <input type="email" class="form-input" id="edit-profile-email" value="juan@example.com">
+                                </div>
+                            </div>
+
+                            <!-- 3. Seguridad -->
+                            <div style="border-top: 1px solid #f5ede6; padding-top: 1.5rem; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+                                <h3 class="form-section-title" style="font-size: 1.2rem; font-weight: 700; color: var(--brand-charcoal); border: none; margin: 0; padding: 0;">Cambiar contraseña</h3>
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-profile-curr-pass">Contraseña actual</label>
+                                    <input type="password" class="form-input" id="edit-profile-curr-pass" placeholder="Ingresá tu contraseña actual">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label" for="edit-profile-new-pass">Nueva contraseña</label>
+                                        <input type="password" class="form-input" id="edit-profile-new-pass" placeholder="Nueva contraseña">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="edit-profile-conf-pass">Confirmar nueva contraseña</label>
+                                        <input type="password" class="form-input" id="edit-profile-conf-pass" placeholder="Confirmar contraseña">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Actions -->
+                            <div class="form-actions-row" style="margin-top: 2rem;">
+                                <button class="eval-submit-btn" id="btn-save-profile-changes">Guardar cambios</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-profile-edit" style="margin-top: 0;">Cancelar</button>
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: FAVORITOS (6.3) ==================== -->
+                <section class="screen-section" id="screen-favorites">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-profile-from-fav-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Favoritos</h1>
+                            <p class="welcome-subtitle">Estas son las organizaciones que guardaste.</p>
+                        </div>
+                    </div>
+
+                    <div class="recommendations-container" style="margin-top: 0; width: 100%;">
+                        <div class="recommendations-grid" id="favorites-grid" style="margin-top: 1rem;">
+                            <!-- Cards will be dynamically injected here -->
+                        </div>
+                        
+                        <div style="margin-top: 3rem; display: flex; justify-content: flex-start;">
+                            <button class="eval-secondary-btn" id="btn-back-to-profile-from-fav-btn" style="margin-top: 0; width: auto; padding-left: 2.5rem; padding-right: 2.5rem;">Volver al perfil</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: MIS RESEÑAS (6.4) ==================== -->
+                <section class="screen-section" id="screen-reviews">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-profile-from-reviews-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Mis reseñas</h1>
+                            <p class="welcome-subtitle">Estas son las evaluaciones que realizaste.</p>
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <!-- Action Volver Button row -->
+                        <div id="reviews-actions-row" style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-secondary-btn" id="btn-back-to-profile-from-reviews-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver al perfil</button>
+                        </div>
+
+                        <!-- 1. Reviews List View -->
+                        <div id="reviews-list-view" class="manage-services-list">
+                             <!-- Cards will be dynamically injected here -->
+                        </div>
+
+                                <!-- 2. Edit Review Form Card (Hidden by default) -->
+                        <div id="edit-review-form-card" class="suggest-form-card" style="display: none; max-width: 720px; margin-top: 1rem;">
+                            <h3 class="form-section-title" style="font-size: 1.5rem; color: var(--brand-charcoal); border: none; margin-bottom: 1.5rem; padding: 0;">Editar reseña</h3>
+                            
+                            <!-- Rating Selectable Stars -->
+                            <div class="form-group" style="margin-bottom: 1.5rem;">
+                                <label class="form-label">Calificación</label>
+                                <div class="star-rating-container" style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                                    <svg class="star-pill-svg" data-rating="1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; cursor: pointer; color: var(--brand-mustard);">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                    <svg class="star-pill-svg" data-rating="2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; cursor: pointer; color: var(--brand-mustard);">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                    <svg class="star-pill-svg" data-rating="3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; cursor: pointer; color: var(--brand-mustard);">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                    <svg class="star-pill-svg" data-rating="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; cursor: pointer; color: var(--brand-mustard);">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                    <svg class="star-pill-svg" data-rating="5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; cursor: pointer; color: var(--brand-mustard);">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Tags Selection -->
+                            <div class="form-group" style="margin-bottom: 1.5rem;">
+                                <label class="form-label">Etiquetas de la organización</label>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0.25rem 0 0.75rem 0;">Podés elegir varias.</p>
+                                <div style="margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #3ca374;">✓ Positivo</span>
+                                </div>
+                                <div class="eval-tags-grid" id="edit-review-tags-grid" style="margin-top: 0.25rem; margin-bottom: 1rem;">
+                                    <span class="eval-tag-pill" data-tag="Buen trato">Buen trato</span>
+                                    <span class="eval-tag-pill" data-tag="Ambiente seguro">Ambiente seguro</span>
+                                    <span class="eval-tag-pill" data-tag="Limpio">Limpio</span>
+                                    <span class="eval-tag-pill" data-tag="Horarios cumplidos">Horarios cumplidos</span>
+                                    <span class="eval-tag-pill" data-tag="Comida abundante">Comida abundante</span>
+                                    <span class="eval-tag-pill" data-tag="Atención rápida">Atención rápida</span>
+                                    <span class="eval-tag-pill" data-tag="Fácil acceso">Fácil acceso</span>
+                                    <span class="eval-tag-pill" data-tag="Personal amable">Personal amable</span>
+                                    <span class="eval-tag-pill" data-tag="Mucha disponibilidad de recursos">Mucha disponibilidad de recursos</span>
+                                </div>
+                                <div style="margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--brand-rust);">&#8593; Para mejorar</span>
+                                </div>
+                                <div class="eval-tags-grid" style="margin-top: 0.25rem;">
+                                    <span class="eval-tag-pill" data-tag="Poco personal">Poco personal</span>
+                                    <span class="eval-tag-pill" data-tag="Horarios limitados">Horarios limitados</span>
+                                    <span class="eval-tag-pill" data-tag="Mucha espera">Mucha espera</span>
+                                    <span class="eval-tag-pill" data-tag="Información poco clara">Información poco clara</span>
+                                    <span class="eval-tag-pill" data-tag="Falta de higiene">Falta de higiene</span>
+                                    <span class="eval-tag-pill" data-tag="Ambiente poco climatizado">Ambiente poco climatizado</span>
+                                    <span class="eval-tag-pill" data-tag="Poca disponibilidad de recursos">Poca disponibilidad de recursos</span>
+                                </div>
+                            </div>
+
+                            <!-- Form Actions -->
+                            <div class="form-actions-row">
+                                <button class="eval-submit-btn" id="btn-save-review-changes">Guardar cambios</button>
+                                <button class="eval-secondary-btn" id="btn-cancel-review-edit" style="margin-top: 0;">Cancelar</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ==================== SCREEN: MIS SUGERENCIAS (6.5) ==================== -->
+                <section class="screen-section" id="screen-suggestions">
+                    <div class="welcome-banner">
+                        <button class="back-btn" id="btn-back-to-profile-from-suggestions-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="back-icon">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            <span>Volver</span>
+                        </button>
+                        <div class="welcome-text-wrapper" style="margin-top: 1.5rem;">
+                            <h1 class="welcome-title">Mis sugerencias</h1>
+                            <p class="welcome-subtitle">Consultá el estado de las organizaciones que sugeriste.</p>
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <!-- Action Volver Button row -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <button class="eval-secondary-btn" id="btn-back-to-profile-from-suggestions-btn" style="margin-top: 0; width: auto; padding-left: 2rem; padding-right: 2rem;">Volver al perfil</button>
+                        </div>
+
+                        <!-- Suggestions List View -->
+                        <div id="suggestions-list-view" class="manage-services-list">
+                             <!-- Cards will be dynamically injected here -->
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+        
+    </div>
+
+    <!-- Leaflet Map JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- JavaScript logic -->
+    <script src="app.js"></script>
+</body>
+</html>
+
+
