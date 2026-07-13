@@ -4,11 +4,97 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Session Storage persistence
+    if (window.INJECTED_DATA?.logout_signal) {
+        sessionStorage.removeItem("comunitas_current_user");
+    } else if (window.INJECTED_DATA?.current_user) {
+        sessionStorage.setItem("comunitas_current_user", JSON.stringify(window.INJECTED_DATA.current_user));
+    } else {
+        const savedUser = sessionStorage.getItem("comunitas_current_user");
+        if (savedUser && window.INJECTED_DATA) {
+            window.INJECTED_DATA.current_user = JSON.parse(savedUser);
+        }
+    }
+
+    // --- Access Helpers ---
+    window.getCurrentUserId = function() {
+        return Number(window.INJECTED_DATA?.current_user?.supabase_user_id || 1);
+    };
+
+    window.getCurrentUserMemberships = function() {
+        const currentUserId = window.getCurrentUserId();
+        return (window.INJECTED_DATA?.organization_members_full || []).filter(member =>
+            Number(member.user_id) === currentUserId &&
+            member.is_active === true
+        );
+    };
+
+    window.getCurrentUserSuggestions = function() {
+        const currentUserId = window.getCurrentUserId();
+        return (window.INJECTED_DATA?.suggested_organizations_full || []).filter(suggestion =>
+            Number(suggestion.user_id) === Number(currentUserId)
+        );
+    };
+
+    window.getCurrentUserFavorites = function() {
+        const currentUserId = window.getCurrentUserId();
+        return (window.INJECTED_DATA?.favorites_full || []).filter(fav =>
+            Number(fav.user_id) === Number(currentUserId)
+        );
+    };
+
+    window.getCurrentUserReviews = function() {
+        const currentUserId = window.getCurrentUserId();
+        return (window.INJECTED_DATA?.reviews_full || []).filter(review =>
+            Number(review.user_id) === Number(currentUserId)
+        );
+    };
+
+    window.isFavoriteOrg = function(orgId) {
+        return window.getCurrentUserFavorites().some(fav =>
+            Number(fav.org_id) === Number(orgId)
+        );
+    };
+
+    window.getReviewAuthorName = function(review) {
+        if (review.full_name) return review.full_name;
+        if (review.user_name) return review.user_name;
+
+        const currentUser = window.INJECTED_DATA?.current_user;
+        if (
+            currentUser?.full_name &&
+            Number(currentUser.supabase_user_id) === Number(review.user_id)
+        ) {
+            return currentUser.full_name;
+        }
+
+        const users = window.INJECTED_DATA?.users || [];
+        const user = users.find(u =>
+            Number(u.user_id) === Number(review.user_id)
+        );
+
+        if (user?.full_name) return user.full_name;
+
+        return "Usuario";
+    };
+
+    window.canAccessMyOrganization = function() {
+        return window.getCurrentUserMemberships().length > 0;
+    };
+
     // DOM Elements
     const sidebar = document.getElementById('main-sidebar');
     const navButtons = document.querySelectorAll('.nav-btn');
     const menuToggle = document.getElementById('menu-toggle');
     
+    // Check permissions and hide nav button if needed
+    const btnMyOrgNav = document.getElementById('btn-my-org');
+    if (btnMyOrgNav) {
+        if (!window.canAccessMyOrganization()) {
+            btnMyOrgNav.style.display = 'none';
+        }
+    }
+
     // Dynamic overlay for mobile sidebar drawer
     let overlay = null;
 
@@ -140,13 +226,60 @@ document.addEventListener('DOMContentLoaded', () => {
             const mainContent = document.getElementById('main-content');
             if (mainContent) mainContent.scrollTop = 0;
 
+            if (targetId === 'my-org') {
+                populateMyOrgDashboard();
+            }
+
             // If navigating to the Map screen, initialize and invalidate size
             if (targetId === 'map') {
                 setTimeout(() => {
                     initLeafletMap();
                     if (map) {
+                        // Recalculate organizations to keep services in sync when returning to the map
+                        allMapOrganizations = getAllOrganizations();
+                        applyMapFilters();
+                        
                         map.invalidateSize();
-                        if (targetMapOrgName) {
+                        if (targetMapLat && targetMapLng) {
+                            clearMapFilters();
+                            map.setView([targetMapLat, targetMapLng], 15);
+                            
+                            // Try to open existing marker popup
+                            let foundLayer = false;
+                            if (markersLayerGroup) {
+                                markersLayerGroup.eachLayer(layer => {
+                                    if (layer.options.title === targetMapOrgName) {
+                                        layer.openPopup();
+                                        foundLayer = true;
+                                    }
+                                });
+                            }
+                            
+                            // If not found in mock layers, inject a temporary marker so there's a pin to see
+                            if (!foundLayer && targetMapOrgName) {
+                                const tempMarker = L.marker([targetMapLat, targetMapLng], {
+                                    icon: getMarkerIcon(),
+                                    title: targetMapOrgName
+                                }).addTo(map);
+                                
+                                tempMarker.bindPopup(`
+                                    <div class="custom-leaflet-popup">
+                                        <div class="map-popup-header">
+                                            <h4 class="map-popup-name">${targetMapOrgName}</h4>
+                                        </div>
+                                        <div style="padding: 0.5rem; text-align: center;">
+                                            <span style="font-size: 0.85rem; color: var(--brand-rust); font-weight: 600;">Pin de Supabase</span>
+                                        </div>
+                                    </div>
+                                `).openPopup();
+                            }
+                            
+                            targetMapLat = null;
+                            targetMapLng = null;
+                            targetMapOrgName = null;
+                            targetMapOrgId = null;
+                        } else if (targetMapOrgName) {
+                            // Legacy fallback
                             clearMapFilters();
                             const org = allMapOrganizations.find(o => o.name === targetMapOrgName);
                             if (org && org._marker) {
@@ -505,6 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentActiveOrg = null;
     let currentActiveServiceName = "";
     let targetMapOrgName = null;
+    let targetMapOrgId = null;
+    let targetMapLat = null;
+    let targetMapLng = null;
     let detailMiniMap = null;
 
     /**
@@ -599,7 +735,74 @@ document.addEventListener('DOMContentLoaded', () => {
         currentActiveCategory = serviceName;
         listContainer.innerHTML = '';
         
-        let orgs = organizationsByService[serviceName] || [];
+        let orgs = [];
+        if (window.INJECTED_DATA && window.INJECTED_DATA.services_full) {
+            console.log("Render Servicios 2.1 categoría:", serviceName);
+            let rawOrgs = window.INJECTED_DATA.services_full.filter(s => 
+                s.service_type === serviceName && 
+                (s.service_status === 'active' || s.service_status === 'full' || s.status === 'active' || s.status === 'full')
+            );
+
+            // Evitar duplicados de la misma organización para la misma categoría
+            const seenOrgIds = new Set();
+            rawOrgs = rawOrgs.filter(s => {
+                if (seenOrgIds.has(s.org_id)) return false;
+                seenOrgIds.add(s.org_id);
+                return true;
+            });
+            console.log("Servicios usados para 2.1:", rawOrgs);
+            
+            // Helper function to format rating
+            function formatRating(averageRating, totalReviews) {
+                const reviews = Number(totalReviews || 0);
+                const rating = averageRating === null || averageRating === undefined
+                    ? null
+                    : Number(averageRating);
+
+                if (!reviews || rating === null || Number.isNaN(rating)) {
+                    return {
+                        hasReviews: false,
+                        label: "Sin reseñas",
+                        rating: null,
+                        reviews: 0
+                    };
+                }
+
+                return {
+                    hasReviews: true,
+                    label: rating.toFixed(1),
+                    rating: rating,
+                    reviews: reviews
+                };
+            }
+
+            orgs = rawOrgs.map(s => {
+                let ratingData = { hasReviews: false, label: "Rating no disponible", rating: null, reviews: null };
+                
+                if (window.INJECTED_DATA.organizations_with_rating) {
+                    const ratingInfo = window.INJECTED_DATA.organizations_with_rating.find(
+                        org => Number(org.org_id) === Number(s.org_id)
+                    );
+                    if (ratingInfo) {
+                        ratingData = formatRating(ratingInfo.average_rating, ratingInfo.total_reviews);
+                    }
+                }
+
+                return {
+                    org_id: s.org_id,
+                    name: s.organization_name,
+                    ratingData: ratingData,
+                    description: s.description || '',
+                    tags: [],
+                    status: s.service_status === 'active' || s.organization_status === 'active' ? 'Activo' : 'Inactivo',
+                    schedule: s.schedule || 'Sin horario especificado',
+                    lat: s.latitude,
+                    lng: s.longitude,
+                    address: s.address,
+                    title: s.title || ''
+                };
+            });
+        }
         
         const allOrgsCount = orgs.length;
         if (allOrgsCount === 0) {
@@ -613,24 +816,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Apply filters if they exist
         if (activeServiceFilters) {
             orgs = orgs.filter(org => {
-                // 1. Estado filter
-                if (activeServiceFilters.status !== 'All') {
-                    if (org.status !== activeServiceFilters.status) return false;
-                }
-
                 // 2. Calificación filter
-                if (activeServiceFilters.rating !== 'All') {
+                if (activeServiceFilters.rating && activeServiceFilters.rating !== 'All') {
                     const minRating = parseFloat(activeServiceFilters.rating);
-                    if (parseFloat(org.rating) < minRating) return false;
-                }
-
-                // 3. Horario filter
-                if (activeServiceFilters.schedule !== 'All') {
-                    if (!matchesSchedule(org.schedule, activeServiceFilters.schedule)) return false;
+                    const orgRating = org.ratingData && org.ratingData.rating !== null ? parseFloat(org.ratingData.rating) : 0;
+                    if (orgRating < minRating) return false;
                 }
 
                 // 4. Distancia filter
-                if (activeServiceFilters.distance !== 'All' && serviceUserLocation) {
+                if (activeServiceFilters.distance && activeServiceFilters.distance !== 'All' && serviceUserLocation) {
                     const maxDist = parseFloat(activeServiceFilters.distance);
                     const dist = getHaversineDistance(serviceUserLocation.lat, serviceUserLocation.lng, org.lat, org.lng);
                     if (dist > maxDist) return false;
@@ -678,22 +872,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="org-list-info">
                     <div class="org-list-header">
                         <h3 class="org-list-name">${org.name}</h3>
-                        <div class="org-list-rating" aria-label="Calificación ${org.rating} estrellas de ${org.reviews} opiniones">
+                        ${org.ratingData.hasReviews ? `
+                        <div class="org-list-rating" aria-label="Calificación ${org.ratingData.label} estrellas de ${org.ratingData.reviews} opiniones">
                             <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor" style="width:16px; height:16px; color:var(--brand-mustard);">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
-                            <span class="rating-value">${org.rating}</span>
-                            <span class="rating-count">(${org.reviews} reseñas)</span>
+                            <span class="rating-value">${org.ratingData.label}</span>
+                            <span class="rating-count">(${org.ratingData.reviews} reseñas)</span>
                         </div>
+                        ` : `
+                        <div class="org-list-rating" aria-label="Sin reseñas">
+                            <span class="rating-count" style="margin-left:0; font-style:italic;">${org.ratingData.label}</span>
+                        </div>
+                        `}
                         <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                             <span class="status-badge" style="color: ${statusColor}; font-weight: 600;">• ${org.status}</span>
                             <span class="distance-badge" style="font-size: 0.85rem; font-weight: 600; color: ${distanceColor};">${distanceText}</span>
                         </div>
                     </div>
-                    <p class="org-list-desc">${org.description}</p>
-                    <div class="org-list-tags">
-                        ${tagsMarkup}
-                    </div>
+                    ${org.title ? `<div style="margin-top: 0.5rem; font-weight: 600; color: var(--brand-charcoal); font-size: 0.95rem;">${org.title}</div>` : ''}
+                    <p class="org-list-desc" style="margin-top: ${org.title ? '0.25rem' : '0.5rem'};">${org.description}</p>
+                    ${org.schedule ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">🕒 ${org.schedule}</div>` : ''}
+                    ${org.address ? `<div style="margin-top: 0.25rem; font-size: 0.85rem; color: var(--text-muted);">📍 ${org.address}</div>` : ''}
+                    ${tagsMarkup ? `<div class="org-list-tags">${tagsMarkup}</div>` : ''}
                 </div>
                 <div class="org-list-action" style="display: flex; gap: 0.75rem;">
                     <button class="org-list-btn" style="flex: 1;">Ver detalles</button>
@@ -707,14 +908,39 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                 </div>
             `;
+            const handleCardClick = () => {
+                detailScreenSource = 'service-placeholder';
+                // Provide fallback arrays so the detail screen doesn't crash, plus the org_id
+                const detailOrg = {
+                    org_id: org.org_id,
+                    name: org.name,
+                    rating: org.rating || '5.0',
+                    reviews: org.reviews || '0',
+                    description: org.description,
+                    tags: org.tags || [],
+                    status: org.status,
+                    services: [serviceName],
+                    address: org.address,
+                    phone: '+54 11 4567-8901',
+                    social: '@comunitas',
+                    website: 'www.comunitas.org',
+                    serviceInfo: org.description,
+                    schedule: org.schedule,
+                    needs: ['Alimentos', 'Voluntarios'], // Mock para evitar crash
+                    gallery: ['assets/gallery_dining_room.png'], // Mock para evitar crash
+                    reviewsList: [
+                        { author: 'Usuario', rating: org.rating || '5', tags: ['Buen trato'], date: 'Reciente' }
+                    ]
+                };
+                showOrganizationDetail(detailOrg, serviceName);
+            };
             
             // Route to Detail Screen (Screen 2.2) when clicking anywhere on the card
             card.addEventListener('click', (e) => {
                 if (e.target.closest('.org-list-btn') || e.target.closest('.org-list-map-btn')) {
                     return;
                 }
-                detailScreenSource = 'service-placeholder';
-                showOrganizationDetail(org, serviceName);
+                handleCardClick();
             });
             
             // Route to Detail Screen when clicking the button specifically
@@ -722,8 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn) {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    detailScreenSource = 'service-placeholder';
-                    showOrganizationDetail(org, serviceName);
+                    handleCardClick();
                 });
             }
 
@@ -743,16 +968,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /**
-     * Populate and render the Organization Detail page (Screen 2.2)
-     * @param {Object} org 
-     * @param {string} serviceName 
-     */
-    function showOrganizationDetail(org, serviceName) {
-        currentActiveOrg = org;
+    function showOrganizationDetail(orgParam, serviceName) {
+        currentActiveOrg = orgParam;
         currentActiveServiceName = serviceName;
         const detailContainer = document.getElementById('org-detail-content');
         if (!detailContainer) return;
+
+        // Extract org_id
+        const selectedOrgId = orgParam.org_id;
+        const data = window.INJECTED_DATA || {};
+        const orgData = (data.organizations_with_rating || []).find(o => o.org_id === selectedOrgId);
+
+        if (!orgData) {
+            detailContainer.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--text-muted); font-weight: 500;">
+                    No se encontró información para esta organización.
+                </div>
+            `;
+            showScreen('org-detail');
+            return;
+        }
+
+        const orgServicesData = (data.services_full || []).filter(s => 
+            s.org_id === selectedOrgId && 
+            (s.service_status === 'active' || s.service_status === 'full' || s.status === 'active' || s.status === 'full')
+        );
+        const orgNeedsData = (data.active_needs || []).filter(n => n.org_id === selectedOrgId);
+        const orgReviewsData = (data.reviews_full || []).filter(r => r.org_id === selectedOrgId);
 
         // ── Service icon config (matches Screen 2.0 colors & icons exactly) ────
         const serviceConfig = {
@@ -799,61 +1041,97 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Build services offered badges
-        const orgServices = org.services && org.services.length > 0 ? org.services : [serviceName];
-        const servicesMarkup = orgServices.map(svc => {
-            const cfg = serviceConfig[svc] || serviceConfig['Duchas'];
+        const servicesMarkup = orgServicesData.map(svc => {
+            const svcName = svc.service_type;
+            const cfg = serviceConfig[svcName] || serviceConfig['Duchas'];
             return `
                 <div style="display:flex; flex-direction:column; align-items:center; gap:0.5rem; min-width:80px;">
                     <div class="service-card-icon-wrapper ${cfg.circleClass}" style="width:60px; height:60px; margin:0; flex-shrink:0;">
                         ${cfg.svg}
                     </div>
-                    <span style="font-size:0.85rem; font-weight:700; color:var(--brand-charcoal); text-align:center; line-height:1.25;">${svc}</span>
+                    <span style="font-size:0.85rem; font-weight:700; color:var(--brand-charcoal); text-align:center; line-height:1.25;">${svcName}</span>
                 </div>
             `;
         }).join('');
-
-        // Render current needs items
-        const needsMarkup = org.needs.map(n => `
-            <div class="needs-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="needs-icon">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                <span>${n}</span>
+        
+        const serviceDetailMarkup = orgServicesData.map(svc => `
+            <div style="margin-bottom: 1rem;">
+                <h3 style="font-size:1rem; color:var(--brand-charcoal);">${svc.title || svc.service_type}</h3>
+                ${svc.description ? `<p style="font-size:0.9rem; color:var(--text-muted);">${svc.description}</p>` : ''}
+                ${svc.schedule ? `<p style="font-size:0.85rem; color:var(--brand-rust); margin-top:0.25rem;">🕒 ${svc.schedule}</p>` : ''}
             </div>
         `).join('');
 
+        // Render current needs items
+        let needsMarkup = '';
+        if (orgNeedsData.length === 0) {
+            needsMarkup = '<div style="color: var(--text-muted); font-size: 0.95rem; font-style: italic;">No hay necesidades activas publicadas.</div>';
+        } else {
+            needsMarkup = orgNeedsData.map(n => `
+                <div class="needs-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="needs-icon">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <div>
+                        <div style="font-weight: 600; color: var(--brand-charcoal);">${n.title || n.category || ''}</div>
+                        ${n.description ? `<div style="font-size:0.85rem; color:var(--text-muted);">${n.description}</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         // Render reviews items
-        const reviewsMarkup = org.reviewsList.map(r => {
-            const reviewTags = (r.tags && r.tags.length > 0)
-                ? r.tags.map(t => `<span class="org-list-tag">${t}</span>`).join('')
-                : '';
+        const reviewsMarkup = orgReviewsData.length > 0 ? orgReviewsData.map(r => {
+            let reviewTags = '';
+            if (r.tags) {
+                const tagList = String(r.tags).split(',').map(t => t.trim()).filter(Boolean);
+                reviewTags = tagList.map(t => `<span class="org-list-tag">${t}</span>`).join('');
+            }
+            const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
+
             return `
             <div class="review-item">
                 <div class="review-header">
-                    <span class="review-author">${r.author}</span>
+                    <span class="review-author">${window.getReviewAuthorName(r)}</span>
                     <div style="display:flex; align-items:center; gap:0.25rem;">
                         <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; color:var(--brand-mustard);">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                         </svg>
                         <span style="font-weight:700; font-size:0.9rem;">${r.rating}.0</span>
-                        <span class="review-date">• ${r.date}</span>
+                        ${dateStr ? `<span class="review-date">• ${dateStr}</span>` : ''}
                     </div>
                 </div>
                 ${reviewTags ? `<div class="org-list-tags" style="margin-top:0.5rem; flex-wrap:wrap; display:flex; gap:0.4rem;">${reviewTags}</div>` : ''}
             </div>
-        `;
-        }).join('');
+            `;
+        }).join('') : '<div style="color: var(--text-muted); font-size: 0.95rem; font-style: italic;">No hay reseñas publicadas todavía.</div>';
 
-        // Render photo gallery
-        const galleryMarkup = org.gallery.map(img => `
-            <img src="${img}" alt="Galería de fotos de ${org.name}" class="gallery-img">
-        `).join('');
-
-        const isFav = favoriteOrganizations.some(f => f.name === org.name);
+        // Initialize INJECTED_DATA.favorites_full if undefined
+        window.INJECTED_DATA.favorites_full = window.INJECTED_DATA.favorites_full || [];
+        const isFav = window.isFavoriteOrg(orgData.org_id);
         const favBtnText = isFav ? "♥ Guardado en favoritos" : "♡ Guardar favorito";
         const favBtnStyle = isFav 
             ? "color: var(--brand-rose); border-color: rgba(166,75,88,0.15); background-color: #fbeeef;" 
             : "";
+            
+        const validWebsite = orgData.website && orgData.website !== "--" && String(orgData.website).trim() !== "null";
+        const validInstagram = orgData.instagram && orgData.instagram !== "--" && String(orgData.instagram).trim() !== "null";
+            
+        let locationMarkup = '';
+        if (orgData.latitude && orgData.longitude) {
+            locationMarkup = `
+                <div class="detail-card">
+                    <h2 class="detail-subtitle" style="border-color: #fcefe9;">Ubicación</h2>
+                    <!-- Mini Map Container -->
+                    <div id="detail-mini-map" style="height: 180px; width: 100%; border-radius: 16px; margin-bottom: 1.25rem; z-index: 1; border: 1px solid rgba(76, 67, 61, 0.1);"></div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <button class="evaluate-btn" id="btn-detail-view-map" style="margin: 0;">Ver en mapa de la App</button>
+                        <a href="https://www.google.com/maps/search/?api=1&query=${orgData.latitude},${orgData.longitude}" id="btn-detail-google-maps" target="_blank" style="text-align: center; color: var(--brand-rust); font-weight: 600; text-decoration: none; font-size: 0.95rem; display: block; padding: 0.25rem;">Abrir en Google Maps</a>
+                    </div>
+                </div>
+            `;
+        }
 
         // Set layout innerHTML
         detailContainer.innerHTML = `
@@ -862,41 +1140,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="detail-card">
                     <div class="detail-header">
                         <div class="detail-title-block">
-                            <h1 class="detail-org-name">${org.name}</h1>
+                            <h1 class="detail-org-name">${orgData.name}</h1>
                             <div class="detail-meta">
                                 <div class="detail-rating">
                                     <svg viewBox="0 0 24 24" fill="currentColor">
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
-                                    <span>${org.rating}</span>
-                                    <span style="color:var(--text-muted); font-weight:400; font-size:0.95rem; margin-left:0.25rem;">(${org.reviews} reseñas)</span>
+                                    <span>${orgData.average_rating || '5.0'}</span>
+                                    <span style="color:var(--text-muted); font-weight:400; font-size:0.95rem; margin-left:0.25rem;">(${orgData.total_reviews || '0'} reseñas)</span>
                                 </div>
-                                <span class="status-badge open">• ${org.status}</span>
+                                <span class="status-badge ${orgData.status === 'active' ? 'open' : 'closed'}">• ${orgData.status === 'active' ? 'Activo' : 'Inactivo'}</span>
                             </div>
                         </div>
                         <button class="eval-secondary-btn" id="btn-toggle-favorite" style="width: auto; padding: 0.5rem 1.25rem; height: 42px; margin: 0; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; ${favBtnStyle}">${favBtnText}</button>
                     </div>
-                    <p class="detail-desc-text">${org.description}</p>
+                    <p class="detail-desc-text">${orgData.description || ''}</p>
                 </div>
 
                 <!-- Servicios disponibles -->
                 <div class="detail-card">
                     <h2 class="detail-subtitle">Servicios disponibles</h2>
                     <div style="display:flex; flex-wrap:wrap; gap:1.25rem; margin-top:0.5rem;">
-                        ${servicesMarkup}
+                        ${servicesMarkup || '<p style="color:var(--text-muted); font-size:0.9rem;">No hay servicios registrados.</p>'}
                     </div>
                 </div>
                 
                 <div class="detail-card">
                     <h2 class="detail-subtitle">Detalle del servicio</h2>
-                    <p class="detail-service-info">${org.serviceInfo}</p>
-                </div>
-                
-                <div class="detail-card">
-                    <h2 class="detail-subtitle">Galería de fotos</h2>
-                    <div class="gallery-grid">
-                        ${galleryMarkup}
-                    </div>
+                    ${serviceDetailMarkup || '<p style="color:var(--text-muted); font-size:0.9rem;">Sin detalles adicionales.</p>'}
                 </div>
 
                 <div class="detail-card">
@@ -917,54 +1188,36 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                 <circle cx="12" cy="10" r="3"></circle>
                             </svg>
-                            <span class="info-text">${org.address}</span>
+                            <span class="info-text">${orgData.address || 'No disponible'}</span>
                         </div>
                         <div class="info-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                             </svg>
-                            <span class="info-text">${org.phone}</span>
+                            <span class="info-text">${orgData.phone || 'No disponible'}</span>
                         </div>
+                        ${validWebsite ? `
                         <div class="info-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="2" y1="12" x2="22" y2="12"></line>
-                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                             </svg>
-                            <a href="https://${org.website}" target="_blank" class="info-text" style="color: var(--brand-rust); text-decoration: none; font-weight: 600;">${org.website}</a>
+                            <a href="https://${orgData.website.replace(/^https?:\/\//, '')}" target="_blank" class="info-text" style="color: var(--brand-rust); text-decoration: none; font-weight: 600;">${orgData.website}</a>
                         </div>
+                        ` : ''}
+                        ${validInstagram ? `
                         <div class="info-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
                                 <path d="M24 11.5c0 6-4.5 10.5-10.5 10.5S3 17.5 3 11.5 7.5 1 13.5 1 24 5.5 24 11.5z"></path>
                             </svg>
-                            <span class="info-text">${org.social}</span>
+                            <span class="info-text">${orgData.instagram}</span>
                         </div>
+                        ` : ''}
                     </div>
                 </div>
 
-                <div class="detail-card">
-                    <h2 class="detail-subtitle">Horario de atención</h2>
-                    <div class="info-list">
-                        <div class="info-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                            <span class="info-text" style="font-weight: 600;">${org.schedule}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="detail-card">
-                    <h2 class="detail-subtitle" style="border-color: #fcefe9;">Ubicación</h2>
-                    <!-- Mini Map Container -->
-                    <div id="detail-mini-map" style="height: 180px; width: 100%; border-radius: 16px; margin-bottom: 1.25rem; z-index: 1; border: 1px solid rgba(76, 67, 61, 0.1);"></div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                        <button class="evaluate-btn" id="btn-detail-view-map" style="margin: 0;">Ver en mapa</button>
-                        <a href="#" id="btn-detail-google-maps" target="_blank" style="text-align: center; color: var(--brand-rust); font-weight: 600; text-decoration: none; font-size: 0.95rem; display: block; padding: 0.25rem;">Abrir en Google Maps</a>
-                    </div>
-                </div>
+                ${locationMarkup}
 
                 <div class="detail-card">
                     <h2 class="detail-subtitle" style="border-color: #fbeeef;">Necesidades actuales</h2>
@@ -995,55 +1248,100 @@ document.addEventListener('DOMContentLoaded', () => {
         const evalBtn = document.getElementById('btn-evaluate-org');
         if (evalBtn) {
             evalBtn.addEventListener('click', () => {
-                showEvaluationScreen(org, serviceName);
+                showEvaluationScreen(orgParam, serviceName);
             });
         }
 
         const favBtn = document.getElementById('btn-toggle-favorite');
         if (favBtn) {
-            favBtn.addEventListener('click', () => {
-                const isCurrentlyFav = favoriteOrganizations.some(f => f.name === org.name);
-                if (isCurrentlyFav) {
-                    favoriteOrganizations = favoriteOrganizations.filter(f => f.name !== org.name);
-                    favBtn.textContent = "♡ Guardar favorito";
-                    favBtn.style.color = "";
-                    favBtn.style.backgroundColor = "";
-                    favBtn.style.borderColor = "";
-                    alert("Organización quitada de favoritos.");
-                } else {
-                    favoriteOrganizations.push({
-                        name: org.name,
-                        services: org.services && org.services.length > 0 ? org.services : [serviceName],
-                        rating: org.rating,
-                        status: org.status,
-                        description: org.description
-                    });
-                    favBtn.textContent = "♥ Guardado en favoritos";
-                    favBtn.style.color = "var(--brand-rose)";
-                    favBtn.style.backgroundColor = "#fbeeef";
-                    favBtn.style.borderColor = "rgba(166,75,88,0.15)";
-                    alert("Organización agregada a favoritos.");
+            favBtn.addEventListener('click', async () => {
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !creds.url || !creds.anon_key) {
+                    alert('Error: Credenciales de Supabase no encontradas.');
+                    return;
+                }
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                
+                const isCurrentlyFav = window.isFavoriteOrg(orgData.org_id);
+                
+                const userId = window.getCurrentUserId();
+                
+                favBtn.disabled = true;
+                
+                try {
+                    if (isCurrentlyFav) {
+                        const { error } = await supabaseClient.rpc('remove_favorite', {
+                            p_user_id: userId,
+                            p_org_id: orgData.org_id
+                        });
+                        
+                        if (error) {
+                            console.error("Error completo al actualizar favoritos:", error);
+                            alert('Error al actualizar favoritos: ' + error.message);
+                        } else {
+                            // Remove from local injected data
+                            window.INJECTED_DATA.favorites_full = window.INJECTED_DATA.favorites_full.filter(fav => 
+                                !(Number(fav.user_id) === userId && Number(fav.org_id) === Number(orgData.org_id))
+                            );
+                            favBtn.textContent = "♡ Guardar favorito";
+                            favBtn.style.color = "";
+                            favBtn.style.borderColor = "";
+                            favBtn.style.backgroundColor = "";
+                            alert('Organización quitada de favoritos.');
+                        }
+                    } else {
+                        const { error } = await supabaseClient.rpc('add_favorite', {
+                            p_user_id: userId,
+                            p_org_id: orgData.org_id
+                        });
+                        
+                        if (error) {
+                            console.error("Error completo al actualizar favoritos:", error);
+                            if (error.code === '23505' && error.message && error.message.includes('duplicate key value')) {
+                                alert('Esta organización ya está en favoritos.');
+                            } else {
+                                alert('Error al actualizar favoritos: ' + error.message);
+                            }
+                        } else {
+                            // Add to local injected data
+                            window.INJECTED_DATA.favorites_full.push({
+                                user_id: userId,
+                                org_id: orgData.org_id,
+                                organization_name: orgData.name,
+                                description: orgData.description,
+                                address: orgData.address
+                            });
+                            favBtn.textContent = "♥ Guardado en favoritos";
+                            favBtn.style.color = "var(--brand-rose)";
+                            favBtn.style.borderColor = "rgba(166,75,88,0.15)";
+                            favBtn.style.backgroundColor = "#fbeeef";
+                            alert('Organización agregada a favoritos.');
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error completo al actualizar favoritos:", err);
+                    alert('Error al actualizar favoritos: ' + err.message);
+                } finally {
+                    favBtn.disabled = false;
                 }
             });
         }
 
-        // Bind Location buttons
-        const btnGoogleMaps = document.getElementById('btn-detail-google-maps');
-        if (btnGoogleMaps) {
-            const query = encodeURIComponent(`${org.name} ${org.address}`);
-            btnGoogleMaps.href = `https://www.google.com/maps/search/?api=1&query=${query}`;
-        }
-
-        const btnViewMap = document.getElementById('btn-detail-view-map');
-        if (btnViewMap) {
-            btnViewMap.addEventListener('click', () => {
-                targetMapOrgName = org.name;
+        // Map navigation binding
+        const viewMapBtn = document.getElementById('btn-detail-view-map');
+        if (viewMapBtn) {
+            viewMapBtn.addEventListener('click', () => {
+                targetMapOrgName = orgData.name;
+                targetMapOrgId = orgData.org_id;
+                targetMapLat = orgData.latitude;
+                targetMapLng = orgData.longitude;
                 const mapNavBtn = document.querySelector('.nav-btn[data-target="map"]');
                 if (mapNavBtn) setActiveNavItem(mapNavBtn);
                 showScreen('map');
             });
         }
 
+        showScreen('org-detail');
         // Initialize Mini Map
         setTimeout(() => {
             if (detailMiniMap) {
@@ -1051,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailMiniMap = null;
             }
             const miniMapContainer = document.getElementById('detail-mini-map');
-            if (miniMapContainer && org.lat && org.lng) {
+            if (miniMapContainer && orgData.latitude && orgData.longitude) {
                 detailMiniMap = L.map('detail-mini-map', {
                     zoomControl: false,
                     dragging: false,
@@ -1060,23 +1358,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     boxZoom: false,
                     touchZoom: false,
                     keyboard: false
-                }).setView([org.lat, org.lng], 15);
+                }).setView([orgData.latitude, orgData.longitude], 15);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap'
                 }).addTo(detailMiniMap);
 
-                L.marker([org.lat, org.lng], {
+                L.marker([orgData.latitude, orgData.longitude], {
                     icon: getMarkerIcon(),
-                    title: org.name
+                    title: orgData.name
                 }).addTo(detailMiniMap);
             } else if (miniMapContainer) {
                 miniMapContainer.innerHTML = '<div style="display:flex; height:100%; align-items:center; justify-content:center; background:#f5ede6; color:var(--text-muted); font-size:0.9rem; font-weight:500; border-radius:16px;">Ubicación no disponible</div>';
             }
         }, 150);
 
-        // Route to Screen 2.2 Detail View
-        showScreen('org-detail');
     }
 
     /**
@@ -1213,36 +1509,134 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Submit Button shows a beautiful success state inline
+        // Submit Button shows a beautiful success state inline and writes to Supabase
         const submitBtn = document.getElementById('btn-submit-eval');
         if (submitBtn) {
             submitBtn.addEventListener('click', () => {
-                // Render success state
-                const cardContainer = document.getElementById('eval-form-card-container');
-                if (cardContainer) {
-                    cardContainer.innerHTML = `
-                        <div style="text-align:center; padding: 1.5rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
-                            <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="eval-section-title" style="font-size:1.6rem; color:#2e7d56; margin-bottom:0.5rem;">¡Evaluación enviada!</h3>
-                                <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5;">Muchas gracias por compartir tu experiencia con <strong>${org.name}</strong>. Tu opinión ayuda a que la comunidad esté mejor informada.</p>
-                            </div>
-                            <button class="eval-submit-btn" id="btn-success-back" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver al detalle</button>
-                        </div>
-                    `;
+                if (selectedStars === 0) {
+                    alert('Por favor, selecciona una calificación.');
+                    return;
+                }
 
-                    // Bind success back button
-                    const successBackBtn = document.getElementById('btn-success-back');
-                    if (successBackBtn) {
-                        successBackBtn.addEventListener('click', () => {
-                            showOrganizationDetail(org, serviceName);
-                        });
+                const orgId = org.org_id;
+                const userId = window.getCurrentUserId();
+
+                // Gather selected tags
+                const tagsData = window.INJECTED_DATA.tags || [];
+                const selectedTagElements = evalContainer.querySelectorAll('.eval-tag-pill.selected');
+                const selectedTagNames = Array.from(selectedTagElements).map(el => el.getAttribute('data-tag'));
+                
+                const selectedTagIds = [];
+                for (const tagName of selectedTagNames) {
+                    const tagObj = tagsData.find(t => t.tag_name === tagName);
+                    if (tagObj) {
+                        selectedTagIds.push(tagObj.tag_id);
+                    } else {
+                        alert('No se encontró el tag seleccionado en la base de datos: ' + tagName);
+                        return;
                     }
                 }
+
+                submitBtn.textContent = 'Enviando...';
+                submitBtn.disabled = true;
+
+                // Initialize Supabase Client
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !creds.url || !creds.anon_key) {
+                    alert('Error: Credenciales de Supabase no encontradas.');
+                    submitBtn.textContent = 'Enviar evaluación';
+                    submitBtn.disabled = false;
+                    return;
+                }
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+
+                async function submitReview() {
+                    try {
+                        // 1. Create the review
+                        const { data: revId, error: reviewError } = await supabaseClient.rpc('create_review', {
+                            p_user_id: userId,
+                            p_org_id: orgId,
+                            p_rating: selectedStars
+                        });
+
+                        if (reviewError) {
+                            console.error("Error completo al guardar reseña:", reviewError);
+                            alert('Error al guardar la reseña: ' + reviewError.message);
+                            submitBtn.textContent = 'Enviar evaluación';
+                            submitBtn.disabled = false;
+                            return;
+                        }
+
+                        // 2. Add tags
+                        for (const tagId of selectedTagIds) {
+                            const { error: tagError } = await supabaseClient.rpc('add_review_tag', {
+                                p_review_id: revId,
+                                p_tag_id: tagId
+                            });
+                            if (tagError) {
+                                console.error("Error al asociar tag:", tagError);
+                            }
+                        }
+
+                        // Refresh injected data arrays locally so the detail view reflects the change
+                        
+                        // Update organization average rating & total reviews
+                        const orgRecord = window.INJECTED_DATA.organizations_with_rating.find(o => o.org_id === orgId);
+                        if (orgRecord) {
+                            orgRecord.total_reviews = (orgRecord.total_reviews || 0) + 1;
+                            const prevAvg = parseFloat(orgRecord.average_rating || 0);
+                            orgRecord.average_rating = ((prevAvg * (orgRecord.total_reviews - 1) + selectedStars) / orgRecord.total_reviews).toFixed(1);
+                        }
+
+                        // Append the new review to the reviews_full array
+                        window.INJECTED_DATA.reviews_full = window.INJECTED_DATA.reviews_full || [];
+                        window.INJECTED_DATA.reviews_full.push({
+                            rev_id: revId,
+                            user_id: userId,
+                            full_name: window.getReviewAuthorName({ user_id: userId }),
+                            org_id: orgId,
+                            organization_name: org.name,
+                            rating: selectedStars,
+                            created_at: new Date().toISOString(),
+                            is_reported: false,
+                            tags: selectedTagNames.join(', ')
+                        });
+
+                        // Render success state
+                        const cardContainer = document.getElementById('eval-form-card-container');
+                        if (cardContainer) {
+                            cardContainer.innerHTML = `
+                                <div style="text-align:center; padding: 1.5rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
+                                    <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="eval-section-title" style="font-size:1.6rem; color:#2e7d56; margin-bottom:0.5rem;">Reseña guardada correctamente.</h3>
+                                        <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5;">Muchas gracias por compartir tu experiencia con <strong>${org.name}</strong>. Tu opinión ayuda a que la comunidad esté mejor informada.</p>
+                                    </div>
+                                    <button class="eval-submit-btn" id="btn-success-back" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver al detalle</button>
+                                </div>
+                            `;
+
+                            // Bind success back button
+                            const successBackBtn = document.getElementById('btn-success-back');
+                            if (successBackBtn) {
+                                successBackBtn.addEventListener('click', () => {
+                                    showOrganizationDetail(org, serviceName);
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error completo al guardar reseña:", err);
+                        alert('Error al guardar la reseña: ' + err.message);
+                        submitBtn.textContent = 'Enviar evaluación';
+                        submitBtn.disabled = false;
+                    }
+                }
+
+                submitReview();
             });
         }
 
@@ -1252,14 +1646,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reset service filter UI helper
     function resetServiceFiltersUI() {
-        const selectStatus = document.getElementById('filter-service-status');
         const selectRating = document.getElementById('filter-service-rating');
-        const selectSchedule = document.getElementById('filter-service-schedule');
         const selectDistance = document.getElementById('filter-service-distance');
         
-        if (selectStatus) selectStatus.value = 'All';
         if (selectRating) selectRating.value = 'All';
-        if (selectSchedule) selectSchedule.value = 'All';
         if (selectDistance) {
             selectDistance.value = 'All';
             if (!serviceUserLocation) {
@@ -1287,15 +1677,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Apply service filter helper
     function applyServiceFilters() {
-        const selectStatus = document.getElementById('filter-service-status');
         const selectRating = document.getElementById('filter-service-rating');
-        const selectSchedule = document.getElementById('filter-service-schedule');
         const selectDistance = document.getElementById('filter-service-distance');
         
         activeServiceFilters = {
-            status: selectStatus ? selectStatus.value : 'All',
             rating: selectRating ? selectRating.value : 'All',
-            schedule: selectSchedule ? selectSchedule.value : 'All',
             distance: selectDistance ? selectDistance.value : 'All'
         };
         
@@ -1458,40 +1844,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="card-center-icon"><path d="M12 2v4M10 4h4M4 14l8-7 8 7v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z"></path><path d="M9 22v-4a3 3 0 0 1 6 0v4"></path></svg>';
     }
 
+    function normalizeCommaSeparatedText(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        return String(value)
+            .split(",")
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+
     function renderRecommendedOrgs() {
         const container = document.getElementById('recommendations-grid');
         if (!container) return;
-        container.innerHTML = '';
         
         let orgsToRender = [];
+        let htmlBuilder = "";
         
-        if (window.INJECTED_DATA && window.INJECTED_DATA.status === 'success' && window.INJECTED_DATA.data && window.INJECTED_DATA.data.length > 0) {
-            orgsToRender = window.INJECTED_DATA.data.slice(0, 4); // Show top 4
-        } else {
-            // Fallback mock data
-            orgsToRender = [
-                { name: "Parroquia San José", description: "Duchas calientes, ropa limpia y contención.", service_types: ["Duchas"], status: "active", average_rating: 4.8, total_reviews: 120 },
-                { name: "Comedor Esperanza", description: "Almuerzos diarios y apoyo a familias.", service_types: ["Comida"], status: "active", average_rating: 4.7, total_reviews: 95 },
-                { name: "Centro Comunitario Norte", description: "Apoyo escolar gratuito para niños y jóvenes.", service_types: ["Apoyo escolar"], status: "active", average_rating: 4.6, total_reviews: 78 }
-            ];
-            
-            if (window.INJECTED_DATA && window.INJECTED_DATA.status === 'error') {
-                console.error("Error from Supabase:", window.INJECTED_DATA.message);
-                const banner = document.createElement('div');
-                banner.style.width = '100%';
-                banner.style.padding = '10px';
-                banner.style.background = '#ffe5e5';
-                banner.style.color = '#d32f2f';
-                banner.style.borderRadius = '8px';
-                banner.style.marginBottom = '20px';
-                banner.style.gridColumn = '1 / -1';
-                banner.textContent = "Aviso: No se pudo conectar a Supabase. Mostrando datos de prueba.";
-                container.appendChild(banner);
+        console.log("INJECTED_DATA recibido:", window.INJECTED_DATA);
+
+        if (typeof window.INJECTED_DATA === 'undefined') {
+            const displayMsg = "No se recibieron datos desde Supabase.";
+            console.error(displayMsg);
+            htmlBuilder += `<div style="width: 100%; padding: 10px; background: #ffe5e5; color: #d32f2f; border-radius: 8px; margin-bottom: 20px; grid-column: 1 / -1;">${displayMsg}</div>`;
+        } else if (window.INJECTED_DATA.status === 'error') {
+            const displayMsg = "Error de Supabase: " + window.INJECTED_DATA.message;
+            console.error(displayMsg);
+            htmlBuilder += `<div style="width: 100%; padding: 10px; background: #ffe5e5; color: #d32f2f; border-radius: 8px; margin-bottom: 20px; grid-column: 1 / -1;">${displayMsg}</div>`;
+        } else if (window.INJECTED_DATA.status === 'success') {
+            if (!window.INJECTED_DATA.data || window.INJECTED_DATA.data.length === 0) {
+                const displayMsg = "Supabase respondió correctamente, pero no hay organizaciones disponibles.";
+                console.warn(displayMsg);
+                htmlBuilder += `<div style="width: 100%; padding: 10px; background: #f8f9fa; color: #6c757d; border-radius: 8px; margin-bottom: 20px; grid-column: 1 / -1;">${displayMsg}</div>`;
+            } else {
+                orgsToRender = window.INJECTED_DATA.data.slice(0, 4); // Render top 4
             }
         }
         
-        container.innerHTML += orgsToRender.map(org => {
-            const service = (org.service_types && org.service_types.length > 0) ? org.service_types[0] : 'Duchas';
+        htmlBuilder += orgsToRender.map(org => {
+            const normalizedServices = normalizeCommaSeparatedText(org.service_types);
+            const service = (normalizedServices && normalizedServices.length > 0) ? normalizedServices[0] : 'Duchas';
             const statusClass = org.status === 'active' || org.status === 'activo' || org.status === 'Activo' ? 'open' : 'closed';
             const statusText = org.status === 'active' || org.status === 'activo' || org.status === 'Activo' ? 'Activo' : 'Cerrado';
             
@@ -1525,11 +1916,12 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }).join('');
         
+        container.innerHTML = htmlBuilder;
+        
         // Add click listeners
-        const homeCards = document.querySelectorAll('#screen-home .org-card');
+        const homeCards = container.querySelectorAll('.org-card');
         homeCards.forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (e.target.closest('.details-btn')) e.stopPropagation();
+            const handleCardClick = (e) => {
                 const orgName = card.querySelector('.org-name').textContent;
                 
                 let orgData = null;
@@ -1541,26 +1933,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (orgData) {
                     detailScreenSource = 'home';
-                    const srv = (orgData.service_types && orgData.service_types.length > 0) ? orgData.service_types[0] : 'Duchas';
-                    showOrganizationDetail(orgData, srv);
+                    const normalizedServices = normalizeCommaSeparatedText(orgData.service_types);
+                    const primaryService = (normalizedServices && normalizedServices.length > 0) ? normalizedServices[0] : 'Duchas';
+                    
+                    // Asegurar que el objeto org tenga los campos mock necesarios para que showOrganizationDetail no crashee
+                    // Y mantener el org_id de Supabase
+                    const detailOrg = {
+                        org_id: orgData.org_id || null,
+                        name: orgData.name,
+                        rating: orgData.average_rating || '5.0',
+                        reviews: orgData.total_reviews || '0',
+                        description: orgData.description || '',
+                        tags: ['Recomendado'],
+                        status: orgData.status || 'active',
+                        services: normalizedServices,
+                        address: orgData.address || 'Av. San Martín 1234',
+                        phone: '+54 11 4567-8901',
+                        social: '@comunitas',
+                        website: 'www.comunitas.org',
+                        serviceInfo: orgData.description || 'Información de servicio',
+                        schedule: 'Lunes a Viernes de 09:00 a 17:00 hs',
+                        needs: ['Alimentos', 'Voluntarios'], // Mock para evitar crash
+                        gallery: ['assets/gallery_dining_room.png'], // Mock para evitar crash
+                        reviewsList: [
+                            { author: 'Usuario', rating: orgData.average_rating || '5', tags: ['Buen trato'], date: 'Reciente' }
+                        ]
+                    };
+                    
+                    showOrganizationDetail(detailOrg, primaryService);
                 }
+            };
+
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.details-btn')) return; // handled by btn listener
+                handleCardClick(e);
             });
             const btn = card.querySelector('.details-btn');
             if (btn) {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const orgName = card.querySelector('.org-name').textContent;
-                    let orgData = null;
-                    if (window.INJECTED_DATA && window.INJECTED_DATA.status === 'success') {
-                        orgData = window.INJECTED_DATA.data.find(o => o.name === orgName);
-                    } else {
-                        orgData = orgsToRender.find(o => o.name === orgName);
-                    }
-                    if (orgData) {
-                        detailScreenSource = 'home';
-                        const srv = (orgData.service_types && orgData.service_types.length > 0) ? orgData.service_types[0] : 'Duchas';
-                        showOrganizationDetail(orgData, srv);
-                    }
+                    handleCardClick(e);
                 });
             }
         });
@@ -1575,31 +1987,67 @@ document.addEventListener('DOMContentLoaded', () => {
     let mapUserLocation = null;
 
     /**
-     * Extract a flat list of unique organizations from mock database
+     * Extract a flat list of unique organizations from Supabase data
      */
     function getAllOrganizations() {
-        const uniqueOrgsMap = new Map();
+        if (!window.INJECTED_DATA || !window.INJECTED_DATA.data) return [];
         
-        Object.entries(organizationsByService).forEach(([serviceName, orgList]) => {
-            orgList.forEach(org => {
-                const key = org.name;
-                if (!uniqueOrgsMap.has(key)) {
-                    uniqueOrgsMap.set(key, {
-                        ...org,
-                        services: [serviceName],
-                        primaryService: serviceName,
-                        isFavorite: false
-                    });
-                } else {
-                    const existing = uniqueOrgsMap.get(key);
-                    if (!existing.services.includes(serviceName)) {
-                        existing.services.push(serviceName);
-                    }
-                }
-            });
+        function normalizeCommaSeparatedText(text) {
+            if (!text) return [];
+            return text.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        return window.INJECTED_DATA.data.map(org => {
+            let services = [];
+            
+            if (window.INJECTED_DATA.services_full) {
+                // Calculate active services directly from services_full
+                const orgServices = window.INJECTED_DATA.services_full.filter(service => {
+                    const isOrgMatch = Number(service.org_id) === Number(org.org_id);
+                    const status = service.service_status || service.status;
+                    const isActive = ["active", "full"].includes(status);
+                    return isOrgMatch && isActive;
+                });
+                
+                const serviceTypes = orgServices.map(s => s.service_type || s.category);
+                services = [...new Set(serviceTypes)];
+            } else {
+                services = normalizeCommaSeparatedText(org.service_types);
+            }
+            
+            const primaryService = services.length > 0 ? services[0] : '';
+            
+            const reviews = Number(org.total_reviews || 0);
+            let ratingValue = null;
+            let ratingLabel = "Sin reseñas";
+            let hasReviews = false;
+            
+            if (reviews > 0 && org.average_rating !== null && org.average_rating !== undefined) {
+                ratingValue = Number(org.average_rating).toFixed(1);
+                ratingLabel = ratingValue;
+                hasReviews = true;
+            }
+
+            let isFavorite = window.isFavoriteOrg(org.org_id);
+
+            // Debug mapping requested by user
+            console.log("Mapa servicios visibles para org", org.org_id, services);
+
+            return {
+                org_id: org.org_id,
+                name: org.name,
+                lat: org.latitude,
+                lng: org.longitude,
+                status: org.status === 'active' || org.status === 'Activo' ? 'Activo' : (org.status || 'Inactivo'),
+                services: services,
+                primaryService: primaryService,
+                rating: ratingLabel,
+                rawRatingValue: ratingValue,
+                hasReviews: hasReviews,
+                total_reviews: reviews,
+                isFavorite: isFavorite
+            };
         });
-        
-        return Array.from(uniqueOrgsMap.values());
     }
 
     /**
@@ -1718,11 +2166,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const servicesCirclesMarkup = org.services.map(s => getServiceIconMarkup(s)).join('');
             const primaryService = org.primaryService || org.services[0];
 
+            let ratingMarkup = '';
+            if (org.hasReviews) {
+                ratingMarkup = `
+                    <div class="map-popup-rating">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; color: var(--brand-mustard); margin-right: 0.15rem;">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        <span>${org.rating}</span>
+                    </div>
+                `;
+            } else {
+                ratingMarkup = `
+                    <div class="map-popup-rating">
+                        <span style="font-style:italic; font-size:0.8rem;">Sin reseñas</span>
+                    </div>
+                `;
+            }
+
             const popupContent = `
                 <div class="custom-leaflet-popup">
                     <div class="map-popup-header">
                         <h4 class="map-popup-name">${org.name}</h4>
-                        <button class="map-popup-fav-btn ${org.isFavorite ? 'active' : ''}" data-org="${org.name}" aria-label="Guardar en favoritos">
+                        <button class="map-popup-fav-btn ${org.isFavorite ? 'active' : ''}" data-orgid="${org.org_id}" aria-label="Guardar en favoritos">
                             <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
                                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                             </svg>
@@ -1733,14 +2199,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="map-popup-meta">
                         <span class="status-badge open" style="font-size: 0.75rem;">• ${org.status}</span>
-                        <div class="map-popup-rating">
-                            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; color: var(--brand-mustard); margin-right: 0.15rem;">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                            </svg>
-                            <span>${org.rating}</span>
-                        </div>
+                        ${ratingMarkup}
                     </div>
-                    <button class="map-popup-btn btn-view-popup-details" data-org="${org.name}" data-service="${primaryService}">Ver detalles</button>
+                    <button class="map-popup-btn btn-view-popup-details" data-orgid="${org.org_id}" data-service="${primaryService}">Ver detalles</button>
                 </div>
             `;
 
@@ -1773,6 +2234,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get filter selections
         const serviceAllChecked = document.getElementById('service-all')?.checked;
         const selectedServices = serviceAllChecked ? [] : Array.from(document.querySelectorAll('input[name="service"]:not(#service-all):checked')).map(el => el.value);
+
+        console.log("Mapa filtro seleccionado:", selectedServices);
 
         const statusAllChecked = document.getElementById('status-all')?.checked;
         const selectedStatuses = statusAllChecked ? [] : Array.from(document.querySelectorAll('input[name="status"]:not(#status-all):checked')).map(el => el.value);
@@ -1864,6 +2327,47 @@ document.addEventListener('DOMContentLoaded', () => {
         allMapOrganizations = getAllOrganizations();
         renderMapMarkers(allMapOrganizations);
 
+        // User location marker logic
+        function updateUserMarker(lat, lng) {
+            const userIcon = L.divIcon({
+                className: 'user-location-marker',
+                html: `<div style="width: 16px; height: 16px; background-color: #4285F4; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.4);"></div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            });
+            if (!window.userLocationMarker) {
+                window.userLocationMarker = L.marker([lat, lng], {
+                    icon: userIcon,
+                    zIndexOffset: 1000,
+                    interactive: false // Prevents blocking clicks on nearby org pins
+                }).addTo(map);
+            } else {
+                window.userLocationMarker.setLatLng([lat, lng]);
+            }
+        }
+
+        if (mapUserLocation) {
+            updateUserMarker(mapUserLocation.lat, mapUserLocation.lng);
+        } else if (navigator.geolocation && !window.locationRequested) {
+            window.locationRequested = true;
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    mapUserLocation = { lat, lng };
+                    updateUserMarker(lat, lng);
+                    
+                    document.querySelectorAll('input[name="distance"]').forEach(el => {
+                        el.removeAttribute('disabled');
+                    });
+                },
+                (error) => {
+                    console.warn('No se pudo obtener tu ubicación.', error);
+                    alert('No se pudo obtener tu ubicación.');
+                }
+            );
+        }
+
         // Bind Leaflet popup events to select details button and toggle hearts
         map.on('popupopen', (e) => {
             const popupNode = e.popup.getElement();
@@ -1871,12 +2375,64 @@ document.addEventListener('DOMContentLoaded', () => {
             // Heart toggling
             const favBtn = popupNode.querySelector('.map-popup-fav-btn');
             if (favBtn) {
-                favBtn.addEventListener('click', () => {
-                    const orgName = favBtn.getAttribute('data-org');
-                    const org = allMapOrganizations.find(o => o.name === orgName);
-                    if (org) {
-                        org.isFavorite = !org.isFavorite;
-                        favBtn.classList.toggle('active', org.isFavorite);
+                favBtn.addEventListener('click', async () => {
+                    const orgId = favBtn.getAttribute('data-orgid');
+                    const org = allMapOrganizations.find(o => Number(o.org_id) === Number(orgId));
+                    if (!org) return;
+
+                    const creds = window.INJECTED_DATA.credentials;
+                    if (!creds || !creds.url || !creds.anon_key) {
+                        alert('Error: Credenciales de Supabase no encontradas.');
+                        return;
+                    }
+                    const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                    const userId = window.getCurrentUserId();
+
+                    window.INJECTED_DATA.favorites_full = window.INJECTED_DATA.favorites_full || [];
+                    const isCurrentlyFav = window.isFavoriteOrg(orgId);
+
+                    favBtn.disabled = true;
+                    try {
+                        if (isCurrentlyFav) {
+                            const { error } = await supabaseClient.rpc('remove_favorite', { p_user_id: userId, p_org_id: orgId });
+                            if (error) {
+                                console.error("Error completo al actualizar favoritos:", error);
+                                alert('Error al actualizar favoritos: ' + error.message);
+                            } else {
+                                alert('Organización quitada de favoritos.');
+                                window.INJECTED_DATA.favorites_full = window.INJECTED_DATA.favorites_full.filter(fav => 
+                                    !(Number(fav.user_id) === userId && Number(fav.org_id) === Number(orgId))
+                                );
+                                org.isFavorite = false;
+                                favBtn.classList.remove('active');
+                            }
+                        } else {
+                            const { error } = await supabaseClient.rpc('add_favorite', { p_user_id: userId, p_org_id: orgId });
+                            if (error) {
+                                console.error("Error completo al actualizar favoritos:", error);
+                                if (error.code === '23505' && error.message && error.message.includes('duplicate key value')) {
+                                    alert('Esta organización ya está en favoritos.');
+                                } else {
+                                    alert('Error al actualizar favoritos: ' + error.message);
+                                }
+                            } else {
+                                alert('Organización agregada a favoritos.');
+                                window.INJECTED_DATA.favorites_full.push({
+                                    user_id: userId,
+                                    org_id: orgId,
+                                    organization_name: org.name,
+                                    description: "",
+                                    address: ""
+                                });
+                                org.isFavorite = true;
+                                favBtn.classList.add('active');
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error completo al actualizar favoritos:", err);
+                        alert('Error al actualizar favoritos: ' + err.message);
+                    } finally {
+                        favBtn.disabled = false;
                     }
                 });
             }
@@ -1885,12 +2441,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const detailsBtn = popupNode.querySelector('.btn-view-popup-details');
             if (detailsBtn) {
                 detailsBtn.addEventListener('click', () => {
-                    const orgName = detailsBtn.getAttribute('data-org');
+                    const orgId = detailsBtn.getAttribute('data-orgid');
                     const serviceName = detailsBtn.getAttribute('data-service');
-                    const org = allMapOrganizations.find(o => o.name === orgName);
-                    if (org) {
+                    const ratingInfo = (window.INJECTED_DATA.organizations_with_rating || []).find(o => Number(o.org_id) === Number(orgId));
+                    if (ratingInfo) {
                         detailScreenSource = 'map';
-                        showOrganizationDetail(org, serviceName);
+                        showOrganizationDetail(ratingInfo, serviceName);
+                    } else {
+                        alert("No se encontraron detalles para esta organización.");
                     }
                 });
             }
@@ -1981,12 +2539,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnViewOrgRequests = document.getElementById('btn-view-org-requests');
     if (btnViewOrgRequests) {
         btnViewOrgRequests.addEventListener('click', () => {
+            if (typeof renderOrgRequests === 'function') renderOrgRequests();
             showScreen('org-requests');
         });
     }
 
     // Admin state and logic
-    let isAdmin = true; // Mock admin state
+    const isAdmin = window.INJECTED_DATA.current_user?.role === "admin";
 
     // Mock pending requests state
     let adminPendingRequests = [
@@ -2001,51 +2560,218 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const cardAdminRequests = document.getElementById('card-admin-requests');
-    if (cardAdminRequests) {
-        if (isAdmin) {
-            cardAdminRequests.style.display = 'flex';
-        } else {
-            cardAdminRequests.style.display = 'none';
-        }
+    const cardSuggestOrg = document.getElementById('card-suggest-org');
+    const cardViewRequests = document.getElementById('card-view-requests');
+    
+    if (isAdmin) {
+        if (cardAdminRequests) cardAdminRequests.style.display = 'flex';
+        if (cardSuggestOrg) cardSuggestOrg.style.display = 'none';
+        if (cardViewRequests) cardViewRequests.style.display = 'none';
+    } else {
+        if (cardAdminRequests) cardAdminRequests.style.display = 'none';
+        if (cardSuggestOrg) cardSuggestOrg.style.display = 'flex';
+        if (cardViewRequests) cardViewRequests.style.display = 'flex';
     }
 
     function renderAdminRequests() {
         const listContainer = document.getElementById('admin-requests-list');
         if (!listContainer) return;
 
-        const pendingReqs = adminPendingRequests.filter(req => req.status === 'Pendiente');
+        const isAdmin = window.INJECTED_DATA.current_user?.role === "admin";
+        if (!isAdmin) {
+            listContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 1.1rem; text-align: center; margin-top: 2rem;">No tenés permisos para acceder a esta sección.</p>';
+            return;
+        }
 
-        if (pendingReqs.length === 0) {
+        console.log("Solicitudes reales inyectadas:", window.INJECTED_DATA.suggested_organizations_full);
+        console.log("Servicios sugeridos reales inyectados:", window.INJECTED_DATA.suggested_services_full);
+
+        const suggestions = window.INJECTED_DATA.suggested_organizations_full || [];
+        const pendingSuggestions = suggestions.filter(s => s.validation_status === "pending");
+        
+        console.log("Solicitudes pendientes filtradas:", pendingSuggestions);
+
+        if (pendingSuggestions.length === 0) {
             listContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 1.1rem; text-align: center; margin-top: 2rem;">No hay solicitudes pendientes.</p>';
             return;
         }
 
         let html = '';
-        pendingReqs.forEach(req => {
+        pendingSuggestions.forEach(req => {
+            const orgServices = (window.INJECTED_DATA.suggested_services_full || []).filter(s => Number(s.sugg_id) === Number(req.sugg_id));
+            
+            let servicesHtml = '';
+            if (orgServices.length > 0) {
+                servicesHtml = orgServices.map(s => `
+                    <div style="background: rgba(0,0,0,0.02); padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem;">
+                        <strong>${s.service_type || 'Servicio'}</strong> - ${s.title || ''}<br>
+                        ${s.description ? `<span style="color:var(--text-muted)">${s.description}</span><br>` : ''}
+                        ${s.schedule ? `<span style="color:var(--text-muted)">Horario: ${s.schedule}</span><br>` : ''}
+                        ${s.status ? `<span style="color:var(--text-muted)">Estado: ${s.status === 'active' ? 'Activo' : s.status}</span>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                servicesHtml = '<p style="color:var(--text-muted); font-size:0.9rem; font-style:italic;">No hay servicios cargados para esta sugerencia.</p>';
+            }
+
+            let dateStr = 'No disponible';
+            if (req.created_at) {
+                const d = new Date(req.created_at);
+                dateStr = d.toLocaleDateString();
+            }
+
             html += `
-                <article class="request-card" style="background: var(--bg-card); border-radius: 24px; padding: 2rem; border: 1px solid rgba(76, 67, 61, 0.05); box-shadow: var(--box-shadow);">
+                <article class="request-card" style="background: var(--bg-card); border-radius: 24px; padding: 2rem; border: 1px solid rgba(76, 67, 61, 0.05); box-shadow: var(--box-shadow); margin-bottom: 1.5rem;">
                     <div class="request-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
                             <h3 class="request-org-name" style="margin: 0; font-size: 1.4rem; color: var(--brand-charcoal);">${req.name}</h3>
-                            <p class="request-desc" style="margin: 0.5rem 0 0; color: var(--text-muted); font-size: 1rem; line-height: 1.5;">${req.desc}</p>
+                            <p class="request-desc" style="margin: 0.5rem 0 0; color: var(--text-muted); font-size: 1rem; line-height: 1.5;">${req.description || 'No disponible'}</p>
                         </div>
-                        <span class="status-badge pending" style="background-color: rgba(207, 94, 40, 0.1); color: var(--brand-rust); font-weight: 600; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem;">${req.status}</span>
+                        <span class="status-badge pending" style="background-color: rgba(207, 94, 40, 0.1); color: var(--brand-rust); font-weight: 600; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem;">Pendiente</span>
                     </div>
-                    <div class="request-meta" style="display: flex; gap: 1.5rem; margin-top: 1.25rem; font-size: 0.9rem; color: var(--text-muted);">
-                        <span><strong>Por:</strong> ${req.submitter}</span>
-                        <span><strong>Fecha:</strong> ${req.date}</span>
+                    
+                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.6; margin-top: 1rem;">
+                        <div><strong>Sugerida por:</strong> ${req.suggested_by || 'No disponible'}</div>
+                        <div><strong>Dirección:</strong> ${req.address || 'No disponible'}</div>
+                        <div><strong>Teléfono:</strong> ${req.phone || 'No disponible'}</div>
+                        <div><strong>Redes/contacto:</strong> ${req.socials || 'No disponible'}</div>
+                        <div><strong>Latitud/Longitud:</strong> ${req.latitude || '-'}, ${req.longitude || '-'}</div>
+                        <div><strong>Fecha de creación:</strong> ${dateStr}</div>
                     </div>
-                    <button class="eval-secondary-btn btn-view-admin-request" data-id="${req.id}" style="margin-top: 1.5rem; width: 100%;">Ver detalle</button>
+
+                    <div style="margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 1rem; margin-bottom: 1rem;">
+                        <h4 style="font-size: 1rem; color: var(--brand-charcoal); margin: 0 0 0.5rem 0;">Servicios asociados</h4>
+                        ${servicesHtml}
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                        <button class="btn-approve-admin" data-id="${req.sugg_id}" style="flex: 1; padding: 0.75rem; border-radius: 30px; border: none; background-color: var(--brand-charcoal); color: white; font-weight: 700; cursor: pointer;">Aprobar</button>
+                        <button class="btn-reject-admin" data-id="${req.sugg_id}" style="flex: 1; padding: 0.75rem; border-radius: 30px; border: 1.5px solid var(--text-muted); background-color: transparent; color: var(--brand-charcoal); font-weight: 700; cursor: pointer;">Rechazar</button>
+                    </div>
                 </article>
             `;
         });
         listContainer.innerHTML = html;
 
-        // Bind view detail buttons
-        const btnViewAdminRequestsList = listContainer.querySelectorAll('.btn-view-admin-request');
-        btnViewAdminRequestsList.forEach(btn => {
-            btn.addEventListener('click', () => {
-                showScreen('admin-review');
+        // Bind Approve buttons
+        listContainer.querySelectorAll('.btn-approve-admin').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const suggId = parseInt(btn.getAttribute('data-id'), 10);
+                if (!confirm("¿Querés aprobar esta organización?")) return;
+
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !window.supabase) {
+                    console.error("Cliente Supabase no inicializado para revisar solicitudes");
+                    alert("Error al revisar solicitud: cliente Supabase no inicializado");
+                    return;
+                }
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                
+                const tempAdminId = 4; // TEMPORAL: hasta implementar login real, usamos user_id = 4 como administrador.
+                
+                const payload = { p_sugg_id: suggId, p_admin_id: tempAdminId };
+                console.log("approve_suggested_organization payload:", payload);
+                
+                btn.disabled = true;
+                btn.textContent = 'Aprobando...';
+                
+                const { data: newOrgId, error } = await supabaseClient.rpc("approve_suggested_organization", payload);
+                console.log("approve_suggested_organization response:", newOrgId, error);
+                
+                if (error) {
+                    console.error("Error completo al aprobar solicitud:", error);
+                    alert("Error al aprobar solicitud: " + error.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Aprobar';
+                    return;
+                }
+                
+                alert("Solicitud aprobada correctamente.");
+                
+                // Update local UI
+                const orgIdx = window.INJECTED_DATA.suggested_organizations_full.findIndex(o => Number(o.sugg_id) === suggId);
+                if (orgIdx !== -1) window.INJECTED_DATA.suggested_organizations_full[orgIdx].validation_status = 'approved';
+                
+                // Refresh data from Supabase without reload
+                try {
+                    const [{ data: servicesFull }, { data: mapOrganizations }, { data: organizationsWithRating }, { data: suggestedOrganizations }, { data: suggestedServices }] = await Promise.all([
+                        supabaseClient.from("view_services_full").select("*"),
+                        supabaseClient.from("view_map_organizations").select("*"),
+                        supabaseClient.from("view_organizations_with_rating").select("*"),
+                        supabaseClient.from("view_suggested_organizations_full").select("*"),
+                        supabaseClient.from("view_suggested_services_full").select("*")
+                    ]);
+
+                    if (servicesFull) window.INJECTED_DATA.services_full = servicesFull;
+                    if (mapOrganizations) window.INJECTED_DATA.data = mapOrganizations;
+                    if (organizationsWithRating) window.INJECTED_DATA.organizations_with_rating = organizationsWithRating;
+                    if (suggestedOrganizations) window.INJECTED_DATA.suggested_organizations_full = suggestedOrganizations;
+                    if (suggestedServices) window.INJECTED_DATA.suggested_services_full = suggestedServices;
+                    
+                    if (typeof getAllOrganizations === 'function') {
+                        allMapOrganizations = getAllOrganizations();
+                    }
+                    if (typeof clearMapFilters === 'function') {
+                        clearMapFilters(); // Re-renders map pins if active
+                    }
+                    if (typeof populateOrganizationsList === 'function' && typeof currentActiveCategory !== 'undefined') {
+                        populateOrganizationsList(currentActiveCategory);
+                    }
+                } catch (e) {
+                    console.error("Error refrescando datos después de aprobar:", e);
+                }
+                
+                renderAdminRequests();
+            });
+        });
+
+        // Bind Reject buttons
+        listContainer.querySelectorAll('.btn-reject-admin').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const suggId = parseInt(btn.getAttribute('data-id'), 10);
+                const reason = prompt("Indicá el motivo de rechazo:");
+                if (!reason || reason.trim() === '') {
+                    if (reason !== null) alert("El motivo de rechazo no puede estar vacío.");
+                    return;
+                }
+
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !window.supabase) {
+                    console.error("Cliente Supabase no inicializado para revisar solicitudes");
+                    alert("Error al revisar solicitud: cliente Supabase no inicializado");
+                    return;
+                }
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                
+                const tempAdminId = 4; // TEMPORAL: hasta implementar login real, usamos user_id = 4 como administrador.
+                
+                const payload = { p_sugg_id: suggId, p_admin_id: tempAdminId, p_reason: reason.trim() };
+                console.log("reject_suggested_organization payload:", payload);
+                
+                btn.disabled = true;
+                btn.textContent = 'Rechazando...';
+                
+                const { error } = await supabaseClient.rpc("reject_suggested_organization", payload);
+                console.log("reject_suggested_organization response:", error);
+                
+                if (error) {
+                    console.error("Error completo al rechazar solicitud:", error);
+                    alert("Error al rechazar solicitud: " + error.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Rechazar';
+                    return;
+                }
+                
+                alert("Solicitud rechazada correctamente.");
+                
+                // Update local UI
+                const orgIdx = window.INJECTED_DATA.suggested_organizations_full.findIndex(o => Number(o.sugg_id) === suggId);
+                if (orgIdx !== -1) {
+                    window.INJECTED_DATA.suggested_organizations_full[orgIdx].validation_status = 'rejected';
+                    window.INJECTED_DATA.suggested_organizations_full[orgIdx].rejection_reason = reason.trim();
+                }
+                
+                renderAdminRequests();
             });
         });
     }
@@ -2072,75 +2798,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnAdminApprove = document.getElementById('btn-admin-approve');
-    if (btnAdminApprove) {
-        btnAdminApprove.addEventListener('click', () => {
-            let approvedReq = null;
-            adminPendingRequests = adminPendingRequests.map(req => {
-                if (req.id === 1 && req.status === 'Pendiente') {
-                    req.status = 'Aprobada';
-                    approvedReq = req;
-                }
-                return req;
-            });
-
-            if (approvedReq) {
-                // Convert to main organizations format
-                const newOrg = {
-                    name: approvedReq.name,
-                    rating: "Sin calificaciones",
-                    reviews: "0",
-                    description: approvedReq.desc,
-                    tags: [], // Optional tags
-                    status: "Activa",
-                    services: approvedReq.services,
-                    lat: approvedReq.lat,
-                    lng: approvedReq.lng,
-                    address: approvedReq.address,
-                    phone: approvedReq.phone,
-                    social: approvedReq.social,
-                    website: "",
-                    serviceInfo: approvedReq.desc,
-                    schedule: approvedReq.schedule,
-                    needs: [],
-                    gallery: [],
-                    reviewsList: []
-                };
-
-                // Add to each service category
-                approvedReq.services.forEach(svc => {
-                    if (!organizationsByService[svc]) {
-                        organizationsByService[svc] = [];
-                    }
-                    organizationsByService[svc].push(newOrg);
-                });
-
-                // Update Leaflet map if already initialized
-                if (typeof map !== 'undefined' && map !== null) {
-                    allMapOrganizations = getAllOrganizations();
-                    renderMapMarkers(allMapOrganizations);
-                }
-            }
-
-            alert('Organización aprobada correctamente.');
-            renderAdminRequests();
-            showScreen('admin-requests');
-        });
-    }
-
-    const btnAdminReject = document.getElementById('btn-admin-reject');
-    if (btnAdminReject) {
-        btnAdminReject.addEventListener('click', () => {
-            adminPendingRequests = adminPendingRequests.map(req => {
-                if (req.id === 1) req.status = 'Rechazada';
-                return req;
-            });
-            alert('Solicitud rechazada correctamente.');
-            renderAdminRequests();
-            showScreen('admin-requests');
-        });
-    }
-
     let suggestFormTemplate = '';
 
     /**
@@ -2162,55 +2819,214 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // 2. Selectable service pills toggle selected class
-        const servicePills = document.querySelectorAll('.service-pill');
-        servicePills.forEach(pill => {
-            pill.addEventListener('click', () => {
-                pill.classList.toggle('selected');
+        // 2. Selectable service pills from Supabase service_types
+        const pillsContainer = document.getElementById('suggest-services-pills-container');
+        const detailsContainer = document.getElementById('suggest-services-details-container');
+        if (pillsContainer) {
+            pillsContainer.innerHTML = '';
+            if (detailsContainer) detailsContainer.innerHTML = '';
+            
+            const serviceTypes = window.INJECTED_DATA?.service_types || [];
+            serviceTypes.forEach(st => {
+                const pill = document.createElement('span');
+                pill.className = 'service-pill';
+                pill.setAttribute('data-id', st.type_id);
+                pill.setAttribute('data-service', st.name);
+                pill.textContent = st.name;
+                pill.addEventListener('click', () => {
+                    const isSelected = pill.classList.toggle('selected');
+                    if (isSelected) {
+                        // Create specific details card for this service
+                        if (detailsContainer) {
+                            const card = document.createElement('div');
+                            card.className = 'service-detail-card';
+                            card.id = `suggest-service-details-${st.type_id}`;
+                            card.style.cssText = 'padding: 1.25rem; border-radius: 8px; border: 1px solid rgba(76, 67, 61, 0.1); background-color: #faf8f5; margin-bottom: 0.5rem; animation: fadeIn 0.3s ease;';
+                            card.innerHTML = `
+                                <h4 style="margin:0 0 1rem 0; font-size:1.1rem; color:var(--brand-charcoal); display:flex; align-items:center; gap:0.5rem;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px; height:18px; color:var(--brand-rust);"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                    ${st.name}
+                                </h4>
+                                <div class="form-group" style="margin-bottom:1rem;">
+                                    <label class="form-label" style="font-size:0.9rem;" for="suggest-service-description-${st.type_id}">Descripción del servicio</label>
+                                    <textarea class="form-textarea" id="suggest-service-description-${st.type_id}" placeholder="Ej: Entrega de desayuno..." style="min-height:60px; font-size:0.95rem;"></textarea>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label" style="font-size:0.9rem;" for="suggest-service-schedule-${st.type_id}">Horario del servicio</label>
+                                    <input type="text" class="form-input" id="suggest-service-schedule-${st.type_id}" placeholder="Ej: Lunes a Viernes 8:00 a 10:00" style="font-size:0.95rem;">
+                                </div>
+                            `;
+                            detailsContainer.appendChild(card);
+                        }
+                    } else {
+                        // Remove specific details card
+                        const card = document.getElementById(`suggest-service-details-${st.type_id}`);
+                        if (card) {
+                            card.remove();
+                        }
+                    }
+                });
+                pillsContainer.appendChild(pill);
             });
-        });
+        }
 
-        // 3. Conditional schedules toggle (No/Sí radio selection)
-        const scheduleRadios = document.querySelectorAll('input[name="suggest-schedule-known"]');
-        const scheduleContainer = document.getElementById('suggest-schedule-container');
-        scheduleRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.value === 'yes') {
-                    scheduleContainer.style.display = 'flex';
-                } else {
-                    scheduleContainer.style.display = 'none';
-                }
-            });
-        });
+        // 3. Conditional schedules toggle removed (now per service)
 
-        // 4. Submit Solicitud triggers success state rendering
+        // 4. Submit Solicitud triggers Supabase RPC calls
         const btnSubmitSuggest = document.getElementById('btn-submit-suggest');
         if (btnSubmitSuggest) {
-            btnSubmitSuggest.addEventListener('click', () => {
-                const formCard = document.getElementById('suggest-form-card-container');
-                if (formCard) {
-                    formCard.innerHTML = `
-                        <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
-                            <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Solicitud enviada!</h3>
-                                <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Solicitud enviada correctamente. Será revisada por un administrador.</p>
-                            </div>
-                            <button class="eval-submit-btn" id="btn-success-back-suggest" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
-                        </div>
-                    `;
+            btnSubmitSuggest.addEventListener('click', async () => {
+                // DATA EXTRACTION & VALIDATION
+                const name = document.getElementById('suggest-name').value.trim();
+                const description = document.getElementById('suggest-desc').value.trim();
+                const address = document.getElementById('suggest-address').value.trim();
+                const phone = document.getElementById('suggest-phone').value.trim();
+                const socials = document.getElementById('suggest-social').value.trim();
+                
+                const latStr = document.getElementById('suggest-lat').value.trim();
+                const lngStr = document.getElementById('suggest-lng').value.trim();
+                const latitude = latStr !== "" ? Number(latStr) : NaN;
+                const longitude = lngStr !== "" ? Number(lngStr) : NaN;
 
-                    // Bind success back button
-                    const btnSuccessBack = document.getElementById('btn-success-back-suggest');
-                    if (btnSuccessBack) {
-                        btnSuccessBack.addEventListener('click', () => {
-                            showScreen('add-org');
-                        });
+                const selectedPills = Array.from(document.querySelectorAll('#suggest-form-card-container .service-pill.selected'));
+                
+                // Validations
+                if (selectedPills.length === 0) {
+                    alert("Seleccioná al menos un servicio para enviar la solicitud.");
+                    return;
+                }
+
+                if (!name || !description || !address || !phone || 
+                    isNaN(latitude) || isNaN(longitude)) {
+                    alert("Completá todos los campos obligatorios.");
+                    return;
+                }
+
+                const finalSocials = socials === "" ? null : socials;
+
+                btnSubmitSuggest.disabled = true;
+                btnSubmitSuggest.textContent = 'Enviando...';
+
+                try {
+                    console.log("Intentando crear cliente Supabase para sugerencia");
+                    const creds = window.INJECTED_DATA.credentials;
+
+                    if (!creds || !window.supabase) {
+                        console.error("Cliente Supabase no inicializado para sugerir organización");
+                        alert("Error al sugerir organización: cliente Supabase no inicializado");
+                        btnSubmitSuggest.disabled = false;
+                        btnSubmitSuggest.textContent = 'Agregar organización';
+                        return;
                     }
+
+                    const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                    console.log("Cliente Supabase creado para sugerencia");
+
+                    const p_user_id = window.getCurrentUserId();
+                    console.log("Usuario actual al crear sugerencia:", window.INJECTED_DATA.current_user);
+                    console.log("CURRENT_USER_ID al crear sugerencia:", p_user_id);
+
+                    const payloadOrg = {
+                        p_user_id: p_user_id,
+                        p_name: name,
+                        p_description: description,
+                        p_address: address,
+                        p_phone: phone,
+                        p_socials: finalSocials,
+                        p_latitude: latitude,
+                        p_longitude: longitude
+                    };
+
+                    console.log("Payload sugerencia enviado a Supabase:", payloadOrg);
+                    const { data: suggId, error: orgError } = await supabaseClient.rpc("create_suggested_organization", payloadOrg);
+                    console.log("create_suggested_organization response:", suggId, orgError);
+
+                    if (orgError) {
+                        console.error("Error completo al crear sugerencia:", orgError);
+                        alert("Error al sugerir organización: " + orgError.message);
+                        btnSubmitSuggest.disabled = false;
+                        btnSubmitSuggest.textContent = 'Enviar solicitud';
+                        return;
+                    }
+
+                    // Add suggested services
+                    const uniqueServicesMap = new Map();
+                    for (const pill of selectedPills) {
+                        const typeName = pill.getAttribute('data-service');
+                        const typeId = parseInt(pill.getAttribute('data-id'), 10) || 1;
+                        if (!uniqueServicesMap.has(typeId)) {
+                            uniqueServicesMap.set(typeId, typeName);
+                        }
+                    }
+
+                    for (const [typeId, typeName] of uniqueServicesMap.entries()) {
+                        const serviceTitle = typeName;
+                        
+                        const descInput = document.getElementById(`suggest-service-description-${typeId}`);
+                        const schedInput = document.getElementById(`suggest-service-schedule-${typeId}`);
+                        
+                        const serviceDescription = (descInput && descInput.value.trim() !== '') ? descInput.value.trim() : "Sin descripción disponible";
+                        const serviceSchedule = (schedInput && schedInput.value.trim() !== '') ? schedInput.value.trim() : "Horario no informado";
+
+                        const payloadService = {
+                            p_sugg_id: suggId,
+                            p_type_id: typeId,
+                            p_title: serviceTitle,
+                            p_description: serviceDescription,
+                            p_schedule: serviceSchedule,
+                            p_status: "active"
+                        };
+
+                        console.log("add_suggested_service payload:", payloadService);
+                        const { data: suggServiceId, error: serviceError } = await supabaseClient.rpc("add_suggested_service", payloadService);
+                        console.log("add_suggested_service response:", suggServiceId, serviceError);
+
+                        if (serviceError) {
+                            console.error("Error completo al agregar servicio sugerido:", serviceError);
+                        }
+                    }
+
+                    // Success - Clear form and show message
+                    document.getElementById('suggest-name').value = '';
+                    document.getElementById('suggest-desc').value = '';
+                    document.getElementById('suggest-address').value = '';
+                    document.getElementById('suggest-phone').value = '';
+                    document.getElementById('suggest-social').value = '';
+                    document.getElementById('suggest-lat').value = '';
+                    document.getElementById('suggest-lng').value = '';
+                    selectedPills.forEach(p => p.classList.remove('selected'));
+                    if (detailsContainer) detailsContainer.innerHTML = '';
+
+                    alert("Organización sugerida correctamente. Quedará pendiente de revisión.");
+                    
+                    // Add to local state to reflect immediately
+                    window.INJECTED_DATA.suggested_organizations_full = window.INJECTED_DATA.suggested_organizations_full || [];
+                    window.INJECTED_DATA.suggested_organizations_full.push({
+                        sugg_id: suggId,
+                        user_id: p_user_id,
+                        name: name,
+                        description: description,
+                        address: address,
+                        phone: phone,
+                        socials: socials,
+                        latitude: latitude,
+                        longitude: longitude,
+                        validation_status: "pending",
+                        created_at: new Date().toISOString()
+                    });
+                    
+                    if (typeof renderOrgRequests === 'function') renderOrgRequests();
+
+                    btnSubmitSuggest.disabled = false;
+                    btnSubmitSuggest.textContent = 'Agregar organización';
+                    
+                    showScreen('add-org');
+
+                } catch (e) {
+                    console.error("Error completo al crear sugerencia:", e);
+                    alert("Error al sugerir organización: " + e.message);
+                    btnSubmitSuggest.disabled = false;
+                    btnSubmitSuggest.textContent = 'Agregar organización';
                 }
             });
         }
@@ -2287,6 +3103,99 @@ document.addEventListener('DOMContentLoaded', () => {
         reviewBlock.style.backgroundColor = req.reviewBg;
         
         document.getElementById('detail-req-review-text').textContent = req.reviewText;
+    }
+
+    function renderOrgRequests() {
+        const container = document.querySelector('.requests-list-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        const svcs = (window.INJECTED_DATA && window.INJECTED_DATA.suggested_services_full) ? window.INJECTED_DATA.suggested_services_full : [];
+        
+        const orgs = window.getCurrentUserSuggestions();
+        
+        console.log("CURRENT_USER_ID:", window.getCurrentUserId());
+        console.log("Todas las sugerencias:", window.INJECTED_DATA?.suggested_organizations_full);
+        console.log("Sugerencias propias:", orgs);
+
+        if (orgs.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Todavía no realizaste sugerencias.</div>';
+            return;
+        }
+        
+        orgs.forEach(org => {
+            const orgServices = svcs.filter(s => Number(s.sugg_id) === Number(org.sugg_id));
+            
+            // Map status
+            let statusBadgeClass = 'pending';
+            let statusLabel = 'Pendiente';
+            if (org.validation_status === 'approved') {
+                statusBadgeClass = 'approved';
+                statusLabel = 'Aprobada';
+            } else if (org.validation_status === 'rejected') {
+                statusBadgeClass = 'rejected';
+                statusLabel = 'Rechazada';
+            }
+            
+            let servicesHtml = '';
+            if (orgServices.length > 0) {
+                servicesHtml = orgServices.map(s => `
+                    <div style="background: rgba(0,0,0,0.02); padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem;">
+                        <strong>${s.service_type || 'Servicio'}</strong> - ${s.title || ''}<br>
+                        ${s.description ? `<span style="color:var(--text-muted)">${s.description}</span><br>` : ''}
+                        ${s.schedule ? `<span style="color:var(--text-muted)">Horario: ${s.schedule}</span><br>` : ''}
+                        ${s.status ? `<span style="color:var(--text-muted)">Estado: ${s.status === 'active' ? 'Activo' : s.status}</span>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                servicesHtml = '<p style="color:var(--text-muted); font-size:0.9rem; font-style:italic;">No hay servicios cargados para esta sugerencia.</p>';
+            }
+            
+            const card = document.createElement('article');
+            card.className = 'request-list-card';
+            card.style.flexDirection = 'column';
+            card.style.alignItems = 'stretch';
+            
+            // Date formatting if exists
+            let dateStr = 'No disponible';
+            if (org.created_at) {
+                const d = new Date(org.created_at);
+                dateStr = d.toLocaleDateString();
+            }
+
+            // rejection reason
+            let rejectionHtml = '';
+            if (org.validation_status === 'rejected' && org.rejection_reason) {
+                rejectionHtml = `<div style="background: #ffebee; color: #c62828; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem;"><strong>Motivo de rechazo:</strong> ${org.rejection_reason}</div>`;
+            }
+
+            card.innerHTML = `
+                <div class="request-card-info" style="width: 100%;">
+                    <div class="request-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 class="request-card-name" style="margin: 0;">${org.name || 'Sin nombre'}</h3>
+                        <span class="status-badge-custom ${statusBadgeClass}">${statusLabel}</span>
+                    </div>
+                    <p class="request-card-desc" style="margin-bottom: 0.5rem; font-weight: 500;">${org.description || 'No disponible'}</p>
+                    
+                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.6;">
+                        <div><strong>Sugerida por:</strong> ${org.suggested_by || 'No disponible'}</div>
+                        <div><strong>Dirección:</strong> ${org.address || 'No disponible'}</div>
+                        <div><strong>Teléfono:</strong> ${org.phone || 'No disponible'}</div>
+                        <div><strong>Redes/contacto:</strong> ${org.socials || 'No disponible'}</div>
+                        <div><strong>Fecha de creación:</strong> ${dateStr}</div>
+                    </div>
+
+                    ${rejectionHtml}
+
+                    <div style="margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 1rem;">
+                        <h4 style="font-size: 1rem; color: var(--brand-charcoal); margin: 0 0 0.5rem 0;">Servicios asociados</h4>
+                        ${servicesHtml}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
     }
 
     // Bind Solicitudes Anteriores (Screen 4.3) buttons and placeholders
@@ -2378,68 +3287,124 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Save Changes ("Guardar cambios")
         const btnSave = document.getElementById('btn-save-edit-my-org');
         if (btnSave) {
-            btnSave.addEventListener('click', () => {
-                const nameVal = document.getElementById('edit-my-org-name').value;
-                const descVal = document.getElementById('edit-my-org-desc').value;
-                const addressVal = document.getElementById('edit-my-org-address').value;
-                const phoneVal = document.getElementById('edit-my-org-phone').value;
-                const instagramVal = document.getElementById('edit-my-org-instagram').value;
-                const websiteVal = document.getElementById('edit-my-org-website').value;
-                const latVal = document.getElementById('edit-my-org-lat').value;
-                const lngVal = document.getElementById('edit-my-org-lng').value;
+            btnSave.addEventListener('click', async () => {
+                const nameVal = document.getElementById('edit-my-org-name').value.trim();
+                const descVal = document.getElementById('edit-my-org-desc').value.trim();
+                const addressVal = document.getElementById('edit-my-org-address').value.trim();
+                const phoneVal = document.getElementById('edit-my-org-phone').value.trim();
+                const instagramVal = document.getElementById('edit-my-org-instagram').value.trim();
+                const websiteVal = document.getElementById('edit-my-org-website').value.trim();
+                const latVal = document.getElementById('edit-my-org-lat').value.trim();
+                const lngVal = document.getElementById('edit-my-org-lng').value.trim();
 
-                // Update Screen 5.1 display values dynamically
-                const headerName = document.getElementById('my-org-header-name');
-                if (headerName) headerName.textContent = nameVal;
-
-                const headerDesc = document.getElementById('my-org-header-desc');
-                if (headerDesc) headerDesc.textContent = descVal;
-
-                const infoAddress = document.getElementById('my-org-info-address');
-                if (infoAddress) infoAddress.textContent = addressVal;
-
-                const infoPhone = document.getElementById('my-org-info-phone');
-                if (infoPhone) infoPhone.textContent = phoneVal;
-
-                const infoInstagram = document.getElementById('my-org-info-instagram');
-                if (infoInstagram) infoInstagram.textContent = instagramVal;
-
-                const infoWebsite = document.getElementById('my-org-info-website');
-                if (infoWebsite) {
-                    infoWebsite.textContent = websiteVal;
-                    infoWebsite.href = websiteVal.startsWith('http') ? websiteVal : `https://${websiteVal}`;
+                if (!nameVal || !descVal || !addressVal) {
+                    alert('Nombre, descripción y dirección son obligatorios.');
+                    return;
+                }
+                
+                const latNum = parseFloat(latVal);
+                const lngNum = parseFloat(lngVal);
+                if (isNaN(latNum) || isNaN(lngNum)) {
+                    alert('Latitud y longitud deben ser valores numéricos válidos.');
+                    return;
                 }
 
-                const infoLat = document.getElementById('my-org-info-lat');
-                if (infoLat) infoLat.textContent = latVal;
+                let currentStatus = 'pending';
+                let currentOrg = window.INJECTED_DATA.organizations_with_rating?.find(o => Number(o.org_id) === 1);
+                if (currentOrg && currentOrg.status) {
+                    currentStatus = currentOrg.status;
+                }
 
-                const infoLng = document.getElementById('my-org-info-lng');
-                if (infoLng) infoLng.textContent = lngVal;
+                const payload = {
+                    p_org_id: 1,
+                    p_name: nameVal,
+                    p_description: descVal,
+                    p_address: addressVal,
+                    p_phone: phoneVal || null,
+                    p_instagram: instagramVal || null,
+                    p_website: websiteVal || null,
+                    p_latitude: latNum,
+                    p_longitude: lngNum,
+                    p_status: currentStatus
+                };
 
-                // Render success confirmation state inside the form container
-                if (editFormContainer) {
-                    editFormContainer.innerHTML = `
-                        <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
-                            <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Información actualizada!</h3>
-                                <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Información actualizada correctamente.</p>
-                            </div>
-                            <button class="eval-submit-btn" id="btn-success-back-edit-my-org" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
-                        </div>
-                    `;
+                const originalBtnText = btnSave.textContent;
+                btnSave.textContent = 'Guardando...';
+                btnSave.disabled = true;
 
-                    // Bind success back button to return to dashboard
-                    const btnSuccessBack = document.getElementById('btn-success-back-edit-my-org');
-                    if (btnSuccessBack) {
-                        btnSuccessBack.addEventListener('click', () => {
-                            showScreen('my-org');
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !window.supabase) {
+                    console.error("Cliente Supabase no inicializado para update_organization");
+                    alert("Error al actualizar la organización: cliente Supabase no inicializado");
+                    btnSave.textContent = originalBtnText;
+                    btnSave.disabled = false;
+                    return;
+                }
+
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+
+                try {
+                    const { error } = await supabaseClient.rpc('update_organization', payload);
+                    if (error) throw error;
+
+                    if (window.INJECTED_DATA.organizations_with_rating) {
+                        const org = window.INJECTED_DATA.organizations_with_rating.find(o => Number(o.org_id) === 1);
+                        if (org) {
+                            org.name = payload.p_name;
+                            org.description = payload.p_description;
+                            org.address = payload.p_address;
+                            org.phone = payload.p_phone;
+                            org.instagram = payload.p_instagram;
+                            org.website = payload.p_website;
+                            org.latitude = payload.p_latitude;
+                            org.longitude = payload.p_longitude;
+                        }
+                    }
+                    
+                    if (window.INJECTED_DATA.map_organizations) {
+                        const mOrg = window.INJECTED_DATA.map_organizations.find(o => Number(o.org_id) === 1);
+                        if (mOrg) Object.assign(mOrg, { name: payload.p_name, latitude: payload.p_latitude, longitude: payload.p_longitude });
+                    }
+                    if (window.INJECTED_DATA.data) {
+                        const dOrg = window.INJECTED_DATA.data.find(o => Number(o.org_id) === 1);
+                        if (dOrg) Object.assign(dOrg, { name: payload.p_name, latitude: payload.p_latitude, longitude: payload.p_longitude });
+                    }
+                    if (window.INJECTED_DATA.services_full) {
+                        window.INJECTED_DATA.services_full.forEach(s => {
+                            if (Number(s.org_id) === 1) {
+                                s.organization_name = payload.p_name;
+                            }
                         });
                     }
+
+                    if (editFormContainer) {
+                        editFormContainer.innerHTML = `
+                            <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
+                                <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Información actualizada!</h3>
+                                    <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Datos de la organización actualizados correctamente.</p>
+                                </div>
+                                <button class="eval-submit-btn" id="btn-success-back-edit-my-org" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
+                            </div>
+                        `;
+
+                        const btnSuccessBack = document.getElementById('btn-success-back-edit-my-org');
+                        if (btnSuccessBack) {
+                            btnSuccessBack.addEventListener('click', () => {
+                                showScreen('my-org');
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error completo al actualizar organización:", err);
+                    alert("Error al actualizar la organización: " + (err.message || "desconocido"));
+                    btnSave.textContent = originalBtnText;
+                    btnSave.disabled = false;
                 }
             });
         }
@@ -2475,35 +3440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     bindMyOrgEvents();
 
-    let myOrgServices = [
-        {
-            id: 1,
-            type: "Duchas",
-            name: "Duchas comunitarias",
-            desc: "Acceso a duchas y elementos básicos de higiene.",
-            schedule: "Lunes a viernes de 9:00 a 12:00",
-            status: "active-status",
-            statusLabel: "Activo"
-        },
-        {
-            id: 2,
-            type: "Ropa",
-            name: "Entrega de ropa",
-            desc: "Entrega de ropa limpia según disponibilidad.",
-            schedule: "Martes y jueves de 10:00 a 13:00",
-            status: "active-status",
-            statusLabel: "Activo"
-        },
-        {
-            id: 3,
-            type: "Comida",
-            name: "Almuerzo comunitario",
-            desc: "Almuerzos para personas y familias del barrio.",
-            schedule: "Lunes a viernes de 12:00 a 14:00",
-            status: "active-status",
-            statusLabel: "Activo"
-        }
-    ];
+    let myOrgServices = [];
 
     let editingServiceId = null;
     let serviceFormTemplate = '';
@@ -2518,12 +3455,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnManageServices = document.getElementById('btn-manage-my-org-services');
         if (btnManageServices) {
             btnManageServices.addEventListener('click', () => {
+                console.log("CLICK Administrar servicios");
                 renderMyOrgServices();
-                // Ensure views are reset
-                document.getElementById('services-list-view').style.display = 'block';
-                document.getElementById('service-form-view').style.display = 'none';
                 showScreen('manage-services');
+                console.log("Administrar servicios abierto correctamente");
             });
+        } else {
+            console.warn("No se encontró btn-manage-my-org-services");
         }
 
         // 2. Back arrow in header & footer Volver button on list view
@@ -2545,11 +3483,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnAddService = document.getElementById('btn-add-service');
         if (btnAddService) {
             btnAddService.addEventListener('click', () => {
-                editingServiceId = null;
-                resetServiceForm();
-                document.getElementById('service-form-title').textContent = "Agregar servicio";
-                document.getElementById('services-list-view').style.display = 'none';
-                document.getElementById('service-form-view').style.display = 'block';
+                console.warn("ALERT PROXIMA ETAPA disparado desde:", "btn-add-service");
+                alert('Esta función se conectará en la próxima etapa.');
             });
         }
 
@@ -2565,45 +3500,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // 5. "Guardar servicio" in form
         const btnSave = document.getElementById('btn-save-service');
         if (btnSave) {
-            btnSave.addEventListener('click', () => {
-                const typeEl     = document.getElementById('service-form-type');
+            btnSave.addEventListener('click', async () => {
                 const nameEl     = document.getElementById('service-form-name');
                 const descEl     = document.getElementById('service-form-desc');
                 const scheduleEl = document.getElementById('service-form-schedule');
                 const statusEl   = document.getElementById('service-form-status');
 
-                const typeVal     = typeEl.value.trim();
                 const nameVal     = nameEl.value.trim();
                 const descVal     = descEl.value.trim();
                 const scheduleVal = scheduleEl.value.trim();
-                const statusVal   = statusEl.value.trim();
+                const rawStatus   = statusEl.value.trim();
 
-                // ── Validation ──────────────────────────────────────────────
-                // Collect which fields are invalid.
-                // Selects always have a chosen value so we check they're non-empty.
-                // Text inputs must have non-blank content.
                 const requiredFields = [
-                    { el: typeEl,     val: typeVal },
-                    { el: nameEl,     val: nameVal },
-                    { el: descEl,     val: descVal },
-                    { el: scheduleEl, val: scheduleVal },
-                    { el: statusEl,   val: statusVal }
+                    { el: scheduleEl, val: scheduleVal }
                 ];
 
-                // Clear previous error state on all fields
                 requiredFields.forEach(({ el }) => el.classList.remove('form-input--error'));
 
-                // Remove any existing error banner
                 const existingBanner = document.getElementById('service-form-error-banner');
                 if (existingBanner) existingBanner.remove();
 
                 const invalidFields = requiredFields.filter(({ val }) => !val);
 
                 if (invalidFields.length > 0) {
-                    // Highlight each invalid field
                     invalidFields.forEach(({ el }) => el.classList.add('form-input--error'));
-
-                    // Remove error highlight when the user starts correcting a field
                     invalidFields.forEach(({ el }) => {
                         const clearError = () => {
                             el.classList.remove('form-input--error');
@@ -2614,7 +3534,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         el.addEventListener('change', clearError);
                     });
 
-                    // Insert inline error banner just above the action buttons row
                     const actionsRow = document.querySelector('#service-form-card-container .form-actions-row');
                     if (actionsRow) {
                         const banner = document.createElement('div');
@@ -2630,70 +3549,91 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                         actionsRow.parentNode.insertBefore(banner, actionsRow);
                     }
-
-                    // Do NOT save, do NOT close the form
                     return;
                 }
 
-                // ── All fields valid — save the service ──────────────────────
-                const statusLabelMap = {
-                    'active-status':    'Activo',
-                    'suspended-status': 'Suspendido',
-                    'full-status':      'Cupo completo',
-                    'inactive-status':  'Inactivo'
-                };
+                let finalStatus = 'inactive';
+                if (rawStatus === 'active-status') finalStatus = 'active';
 
                 if (editingServiceId !== null) {
-                    // Edit mode
                     const svc = myOrgServices.find(s => s.id === editingServiceId);
-                    if (svc) {
-                        svc.type      = typeVal;
-                        svc.name      = nameVal;
-                        svc.desc      = descVal;
-                        svc.schedule  = scheduleVal;
-                        svc.status    = statusVal;
-                        svc.statusLabel = statusLabelMap[statusVal] || 'Activo';
+                    if (!svc) return;
+
+                    const payload = {
+                        p_serv_id: Number(svc.id),
+                        p_type_id: Number(svc.type_id),
+                        p_title: svc.name,
+                        p_description: svc.desc,
+                        p_schedule: scheduleVal,
+                        p_status: finalStatus
+                    };
+                    console.log("update_service payload:", payload);
+
+                    const creds = window.INJECTED_DATA.credentials;
+                    if (!creds || !window.supabase) {
+                        console.error("Cliente Supabase no inicializado para update_service");
+                        alert("Error al actualizar el servicio: cliente Supabase no inicializado");
+                        return;
+                    }
+
+                    const originalBtnText = btnSave.textContent;
+                    btnSave.textContent = 'Guardando...';
+                    btnSave.disabled = true;
+
+                    const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+
+                    try {
+                        const { error } = await supabaseClient.rpc('update_service', payload);
+                        if (error) throw error;
+                        
+                        console.log("update_service OK");
+
+                        if (window.INJECTED_DATA.services_full) {
+                            const dbSvc = window.INJECTED_DATA.services_full.find(s => Number(s.serv_id) === editingServiceId);
+                            if (dbSvc) {
+                                dbSvc.schedule = payload.p_schedule;
+                                dbSvc.service_status = payload.p_status;
+                            }
+                        }
+                        
+                        populateMyOrgDashboard();
+
+                        const formContainer = document.getElementById('service-form-card-container');
+                        if (formContainer) {
+                            formContainer.innerHTML = `
+                                <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
+                                    <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Servicio guardado!</h3>
+                                        <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Servicio actualizado correctamente.</p>
+                                    </div>
+                                    <button class="eval-submit-btn" id="btn-success-back-service" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
+                                </div>
+                            `;
+
+                            const btnSuccessBack = document.getElementById('btn-success-back-service');
+                            if (btnSuccessBack) {
+                                btnSuccessBack.addEventListener('click', () => {
+                                    renderMyOrgServices();
+                                    document.getElementById('services-list-view').style.display = 'block';
+                                    document.getElementById('service-form-view').style.display = 'none';
+                                });
+                            }
+                        }
+
+                    } catch (err) {
+                        console.error("Error completo al actualizar servicio:", err);
+                        alert("Error al actualizar el servicio: " + (err.message || "desconocido"));
+                        btnSave.textContent = originalBtnText;
+                        btnSave.disabled = false;
                     }
                 } else {
-                    // Add mode
-                    const newId = myOrgServices.length > 0 ? Math.max(...myOrgServices.map(s => s.id)) + 1 : 1;
-                    myOrgServices.push({
-                        id:          newId,
-                        type:        typeVal,
-                        name:        nameVal,
-                        desc:        descVal,
-                        schedule:    scheduleVal,
-                        status:      statusVal,
-                        statusLabel: statusLabelMap[statusVal] || 'Activo'
-                    });
-                }
-
-                // Render success confirmation in the form card container
-                if (formContainer) {
-                    formContainer.innerHTML = `
-                        <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
-                            <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Servicio guardado!</h3>
-                                <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Servicio guardado correctamente.</p>
-                            </div>
-                            <button class="eval-submit-btn" id="btn-success-back-service" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
-                        </div>
-                    `;
-
-                    // Bind success button
-                    const btnSuccessBack = document.getElementById('btn-success-back-service');
-                    if (btnSuccessBack) {
-                        btnSuccessBack.addEventListener('click', () => {
-                            renderMyOrgServices();
-                            document.getElementById('services-list-view').style.display = 'block';
-                            document.getElementById('service-form-view').style.display = 'none';
-                        });
-                    }
+                    console.warn("ALERT PROXIMA ETAPA disparado desde:", "btn-save-service else");
+                    alert('Esta función se conectará en la próxima etapa.');
                 }
             });
         }
@@ -2704,6 +3644,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cardsGrid) return;
 
         cardsGrid.innerHTML = '';
+
+        myOrgServices = [];
+        const myOrgId = 1;
+        if (window.INJECTED_DATA.services_full) {
+            const orgServices = window.INJECTED_DATA.services_full.filter(s => Number(s.org_id) === myOrgId);
+            orgServices.forEach(s => {
+                myOrgServices.push({
+                    id: s.serv_id,
+                    type_id: s.type_id,
+                    type: s.service_type || s.type_name || "Servicio",
+                    name: s.title,
+                    desc: s.description,
+                    schedule: s.schedule,
+                    status: s.service_status === 'full' ? 'active' : s.service_status,
+                    statusLabel: (s.service_status === 'active' || s.service_status === 'full') ? 'Activo' : 'Inactivo'
+                });
+            });
+        }
 
         if (myOrgServices.length === 0) {
             cardsGrid.innerHTML = `
@@ -2732,7 +3690,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="manage-service-actions">
                         <button class="request-card-btn btn-edit-service" data-id="${svc.id}">Editar</button>
-                        <button class="request-card-btn btn-delete-service" data-id="${svc.id}">Eliminar</button>
                     </div>
                 `;
 
@@ -2743,19 +3700,39 @@ document.addEventListener('DOMContentLoaded', () => {
             // Bind individual card actions
             const editBtns = cardsGrid.querySelectorAll('.btn-edit-service');
             editBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', (event) => {
                     const id = parseInt(btn.getAttribute('data-id'));
+                    console.log("EDITAR SERVICIO CLICK OK", id);
                     const svc = myOrgServices.find(s => s.id === id);
                     if (svc) {
                         editingServiceId = id;
                         resetServiceForm();
                         
                         document.getElementById('service-form-title').textContent = "Editar servicio";
-                        document.getElementById('service-form-type').value = svc.type;
-                        document.getElementById('service-form-name').value = svc.name;
-                        document.getElementById('service-form-desc').value = svc.desc;
+                        
+                        const typeEl = document.getElementById('service-form-type');
+                        const nameEl = document.getElementById('service-form-name');
+                        const descEl = document.getElementById('service-form-desc');
+                        
+                        let optionExists = Array.from(typeEl.options).some(opt => opt.value === svc.type);
+                        if (!optionExists) {
+                            const newOption = new Option(svc.type, svc.type, true, true);
+                            typeEl.add(newOption);
+                        }
+                        typeEl.value = svc.type;
+                        typeEl.disabled = true;
+                        
+                        nameEl.value = svc.name;
+                        nameEl.disabled = true;
+                        
+                        descEl.value = svc.desc;
+                        descEl.disabled = true;
+                        
                         document.getElementById('service-form-schedule').value = svc.schedule;
-                        document.getElementById('service-form-status').value = svc.status;
+
+                        let formStatusVal = 'inactive-status';
+                        if (svc.status === 'active' || svc.status === 'full') formStatusVal = 'active-status';
+                        document.getElementById('service-form-status').value = formStatusVal;
 
                         document.getElementById('services-list-view').style.display = 'none';
                         document.getElementById('service-form-view').style.display = 'block';
@@ -2765,10 +3742,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const deleteBtns = cardsGrid.querySelectorAll('.btn-delete-service');
             deleteBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const id = parseInt(btn.getAttribute('data-id'));
-                    myOrgServices = myOrgServices.filter(s => s.id !== id);
-                    renderMyOrgServices();
+                btn.addEventListener('click', async () => {
+                    const servIdStr = btn.getAttribute('data-id');
+                    const servId = Number(servIdStr);
+                    
+                    if (confirm('¿Querés desactivar este servicio?')) {
+                        const payload = { p_serv_id: servId };
+                        console.log("deactivate_service payload:", payload);
+                        
+                        try {
+                            const { data, error } = await supabaseClient.rpc('deactivate_service', payload);
+                            
+                            if (error) {
+                                console.error("Error completo al desactivar servicio:", error);
+                                alert("Ocurrió un error al desactivar el servicio.");
+                                return;
+                            }
+                            
+                            console.log("deactivate_service OK");
+                            
+                            // Update local state
+                            if (window.INJECTED_DATA && window.INJECTED_DATA.services_full) {
+                                const localSvc = window.INJECTED_DATA.services_full.find(s => Number(s.serv_id) === servId);
+                                if (localSvc) {
+                                    localSvc.status = 'inactive';
+                                    localSvc.service_status = 'inactive';
+                                }
+                            }
+                            
+                            // Re-render
+                            renderMyOrgServices();
+                            
+                            // Show success message container instead of alert if we had one, but the prompt says to show the message, so we use an alert for simplicity or just re-render. Wait, "mostrar mensaje: Servicio desactivado correctamente."
+                            // We can use a simple alert since there's no feedback container specified for delete.
+                            alert("Servicio desactivado correctamente.");
+                            
+                        } catch (err) {
+                            console.error("Error completo al desactivar servicio:", err);
+                        }
+                    }
                 });
             });
         }
@@ -2806,66 +3818,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     bindManageServicesEvents();
 
-    let myOrgNeeds = [
-        {
-            id: 1,
-            name: "Toallas",
-            category: "Higiene",
-            desc: "Se necesitan toallas limpias para el servicio de duchas.",
-            priority: "high",
-            priorityLabel: "Alta",
-            status: "active-status",
-            statusLabel: "Activa"
-        },
-        {
-            id: 2,
-            name: "Jabón",
-            category: "Higiene",
-            desc: "Se reciben jabones nuevos para kits de higiene.",
-            priority: "medium",
-            priorityLabel: "Media",
-            status: "active-status",
-            statusLabel: "Activa"
-        },
-        {
-            id: 3,
-            name: "Ropa de abrigo",
-            category: "Ropa",
-            desc: "Se necesitan camperas, buzos y frazadas en buen estado.",
-            priority: "high",
-            priorityLabel: "Alta",
-            status: "active-status",
-            statusLabel: "Activa"
-        },
-        {
-            id: 4,
-            name: "Voluntarios",
-            category: "Voluntariado",
-            desc: "Se buscan voluntarios para ayudar en la organización.",
-            priority: "medium",
-            priorityLabel: "Media",
-            status: "active-status",
-            statusLabel: "Activa"
-        }
-    ];
-
-    let editingNeedId = null;
-    let needFormTemplate = '';
+    let myOrgNeeds = [];
 
     function bindManageNeedsEvents() {
-        const formContainer = document.getElementById('need-form-card-container');
-        if (formContainer && !needFormTemplate) {
-            needFormTemplate = formContainer.innerHTML;
-        }
-
         // 1. "Administrar necesidades" button switches to screen 5.4
         const btnManageNeeds = document.getElementById('btn-manage-my-org-needs');
         if (btnManageNeeds) {
             btnManageNeeds.addEventListener('click', () => {
+                myOrgNeeds = [];
+                if (window.INJECTED_DATA && window.INJECTED_DATA.active_needs) {
+                    const orgNeeds = window.INJECTED_DATA.active_needs.filter(n => Number(n.org_id) === 1);
+                    
+                    const priorityLabelMap = {
+                        'low': 'Baja',
+                        'medium': 'Media',
+                        'high': 'Alta',
+                        'urgent': 'Urgente'
+                    };
+                    
+                    orgNeeds.forEach(s => {
+                        myOrgNeeds.push({
+                            id: s.need_id,
+                            name: s.title || s.category,
+                            desc: s.description,
+                            category: s.category,
+                            priority: s.priority || 'medium',
+                            priorityLabel: priorityLabelMap[s.priority] || 'Media',
+                            status: 'active',
+                            statusLabel: 'Activa'
+                        });
+                    });
+                }
+                
                 renderMyOrgNeeds();
-                // Ensure views are reset
-                document.getElementById('needs-list-view').style.display = 'block';
-                document.getElementById('need-form-view').style.display = 'none';
                 showScreen('manage-needs');
             });
         }
@@ -2889,9 +3874,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnAddNeed = document.getElementById('btn-add-need');
         if (btnAddNeed) {
             btnAddNeed.addEventListener('click', () => {
-                editingNeedId = null;
                 resetNeedForm();
-                document.getElementById('need-form-title').textContent = "Nueva necesidad";
                 document.getElementById('needs-list-view').style.display = 'none';
                 document.getElementById('need-form-view').style.display = 'block';
             });
@@ -2909,79 +3892,81 @@ document.addEventListener('DOMContentLoaded', () => {
         // 5. "Guardar necesidad" in form
         const btnSave = document.getElementById('btn-save-need');
         if (btnSave) {
-            btnSave.addEventListener('click', () => {
-                const nameVal = document.getElementById('need-form-name').value;
-                const descVal = document.getElementById('need-form-desc').value;
-                const categoryVal = document.getElementById('need-form-category').value;
+            btnSave.addEventListener('click', async () => {
+                const nameVal = document.getElementById('need-form-name').value.trim();
+                const descVal = document.getElementById('need-form-desc').value.trim();
+                const categoryVal = document.getElementById('need-form-category').value.trim();
                 const priorityVal = document.getElementById('need-form-priority').value;
-                const statusVal = document.getElementById('need-form-status').value;
 
-                const priorityLabelMap = {
-                    'low': 'Baja',
-                    'medium': 'Media',
-                    'high': 'Alta',
-                    'urgent': 'Urgente'
+                if (!nameVal || !descVal || !categoryVal || !['low', 'medium', 'high', 'urgent'].includes(priorityVal)) {
+                    alert("Por favor completá todos los campos y seleccioná una prioridad válida.");
+                    return;
+                }
+
+                const payload = {
+                    p_org_id: 1,
+                    p_title: nameVal,
+                    p_description: descVal,
+                    p_category: categoryVal,
+                    p_priority: priorityVal
                 };
+                
+                console.log("add_need payload:", payload);
 
-                const statusLabelMap = {
-                    'active-status': 'Activa',
-                    'inactive-status': 'Inactiva'
-                };
+                const creds = window.INJECTED_DATA.credentials;
+                if (!creds || !window.supabase) {
+                    console.error("Cliente Supabase no inicializado para add_need");
+                    alert("Error al guardar la necesidad: cliente Supabase no inicializado");
+                    return;
+                }
 
-                if (editingNeedId !== null) {
-                    // Edit mode
-                    const need = myOrgNeeds.find(n => n.id === editingNeedId);
-                    if (need) {
-                        need.name = nameVal;
-                        need.desc = descVal;
-                        need.category = categoryVal;
-                        need.priority = priorityVal;
-                        need.priorityLabel = priorityLabelMap[priorityVal] || 'Media';
-                        need.status = statusVal;
-                        need.statusLabel = statusLabelMap[statusVal] || 'Activa';
-                    }
-                } else {
-                    // Add mode
-                    const newId = myOrgNeeds.length > 0 ? Math.max(...myOrgNeeds.map(n => n.id)) + 1 : 1;
-                    myOrgNeeds.push({
-                        id: newId,
-                        name: nameVal,
-                        desc: descVal,
+                const originalBtnText = btnSave.textContent;
+                btnSave.textContent = "Guardando...";
+                btnSave.disabled = true;
+
+                const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+
+                try {
+                    const { data: newNeedId, error } = await supabaseClient.rpc('add_need', payload);
+                    if (error) throw error;
+
+                    const newNeedObj = {
+                        need_id: newNeedId,
+                        org_id: 1,
+                        organization_name: "Comedor Esperanza Pilar",
+                        title: nameVal,
+                        description: descVal,
                         category: categoryVal,
                         priority: priorityVal,
-                        priorityLabel: priorityLabelMap[priorityVal] || 'Media',
-                        status: statusVal,
-                        statusLabel: statusLabelMap[statusVal] || 'Activa'
-                    });
-                }
+                        created_at: new Date().toISOString()
+                    };
 
-                // Render success confirmation in the form card container
-                if (formContainer) {
-                    formContainer.innerHTML = `
-                        <div style="text-align:center; padding: 2rem 0; display:flex; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
-                            <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Necesidad guardada!</h3>
-                                <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;">Necesidad guardada correctamente.</p>
-                            </div>
-                            <button class="eval-submit-btn" id="btn-success-back-need" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 0.5rem; max-width: 300px;">Volver</button>
-                        </div>
-                    `;
-
-                    // Bind success button
-                    const btnSuccessBack = document.getElementById('btn-success-back-need');
-                    if (btnSuccessBack) {
-                        btnSuccessBack.addEventListener('click', () => {
-                            renderMyOrgNeeds();
-                            document.getElementById('needs-list-view').style.display = 'block';
-                            document.getElementById('need-form-view').style.display = 'none';
-                        });
+                    if (!window.INJECTED_DATA.active_needs) {
+                        window.INJECTED_DATA.active_needs = [];
                     }
+                    window.INJECTED_DATA.active_needs.push(newNeedObj);
+
+                    document.getElementById('need-form-card-container').style.display = 'none';
+                    document.getElementById('need-form-success-container').style.display = 'flex';
+                    
+                } catch (error) {
+                    console.error("Error completo al agregar necesidad:", error);
+                    alert("Error al guardar la necesidad: " + error.message);
+                } finally {
+                    btnSave.textContent = originalBtnText;
+                    btnSave.disabled = false;
                 }
+            });
+        }
+        
+        const btnSuccessBack = document.getElementById('btn-success-back-need');
+        if (btnSuccessBack) {
+            btnSuccessBack.addEventListener('click', () => {
+                document.getElementById('btn-manage-my-org-needs').click();
+                document.getElementById('needs-list-view').style.display = 'block';
+                document.getElementById('need-form-view').style.display = 'none';
+                document.getElementById('need-form-card-container').style.display = 'block';
+                document.getElementById('need-form-success-container').style.display = 'none';
             });
         }
     }
@@ -3001,13 +3986,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             myOrgNeeds.forEach(need => {
                 const card = document.createElement('article');
-                card.className = 'manage-service-card'; // Reuse the card styling
+                card.className = 'manage-service-card';
                 card.innerHTML = `
                     <div class="manage-service-info">
                         <div class="manage-service-header">
                             <h4 class="manage-service-name">${need.name}</h4>
                             <span class="priority-badge-custom priority-${need.priority}">${need.priorityLabel}</span>
-                            <span class="status-badge-custom ${need.status}" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">${need.statusLabel}</span>
                         </div>
                         <p class="manage-service-desc">${need.desc}</p>
                         <div class="manage-service-meta">
@@ -3017,59 +4001,63 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span>Categoría: ${need.category}</span>
                         </div>
                     </div>
-                    <div class="manage-service-actions">
-                        <button class="request-card-btn btn-edit-need" data-id="${need.id}">Editar</button>
-                        <button class="request-card-btn btn-delete-need" data-id="${need.id}">Eliminar</button>
+                    <div class="manage-service-actions" style="justify-content: flex-end;">
+                        <button class="request-card-btn btn-delete-need" data-id="${need.id}" style="color: #d32f2f; background-color: #ffebee;">Desactivar</button>
                     </div>
                 `;
 
-                // Add to DOM
                 cardsGrid.appendChild(card);
-            });
-
-            // Bind individual card actions
-            const editBtns = cardsGrid.querySelectorAll('.btn-edit-need');
-            editBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const id = parseInt(btn.getAttribute('data-id'));
-                    const need = myOrgNeeds.find(n => n.id === id);
-                    if (need) {
-                        editingNeedId = id;
-                        resetNeedForm();
-                        
-                        document.getElementById('need-form-title').textContent = "Editar necesidad";
-                        document.getElementById('need-form-name').value = need.name;
-                        document.getElementById('need-form-desc').value = need.desc;
-                        document.getElementById('need-form-category').value = need.category;
-                        document.getElementById('need-form-priority').value = need.priority;
-                        document.getElementById('need-form-status').value = need.status;
-
-                        document.getElementById('needs-list-view').style.display = 'none';
-                        document.getElementById('need-form-view').style.display = 'block';
-                    }
-                });
             });
 
             const deleteBtns = cardsGrid.querySelectorAll('.btn-delete-need');
             deleteBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
                     const id = parseInt(btn.getAttribute('data-id'));
-                    myOrgNeeds = myOrgNeeds.filter(n => n.id !== id);
-                    renderMyOrgNeeds();
+                    const confirmDeactivate = confirm("¿Querés desactivar esta necesidad?");
+                    if (!confirmDeactivate) return;
+
+                    const payload = { p_need_id: id };
+                    console.log("deactivate_need payload:", payload);
+
+                    const creds = window.INJECTED_DATA.credentials;
+                    if (!creds || !window.supabase) {
+                        console.error("Cliente Supabase no inicializado para deactivate_need");
+                        alert("Error al desactivar la necesidad: cliente Supabase no inicializado");
+                        return;
+                    }
+
+                    const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                    const originalText = btn.textContent;
+                    btn.textContent = "Desactivando...";
+                    btn.disabled = true;
+
+                    try {
+                        const { error } = await supabaseClient.rpc('deactivate_need', payload);
+                        if (error) throw error;
+                        
+                        if (window.INJECTED_DATA.active_needs) {
+                            window.INJECTED_DATA.active_needs = window.INJECTED_DATA.active_needs.filter(n => Number(n.need_id) !== id);
+                        }
+                        
+                        alert("Necesidad desactivada correctamente.");
+                        document.getElementById('btn-manage-my-org-needs').click();
+                        
+                    } catch (error) {
+                        console.error("Error completo al desactivar necesidad:", error);
+                        alert("Error al desactivar la necesidad: " + error.message);
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                    }
                 });
             });
         }
 
-        // Synchronize display list on Screen 5.1 dashboard needs list!
         const dashboardNeedsList = document.getElementById('my-org-needs-list');
         if (dashboardNeedsList) {
             dashboardNeedsList.innerHTML = '';
             
-            // Filter only active status needs
-            const activeNeeds = myOrgNeeds.filter(n => n.status === 'active-status');
-            
-            if (activeNeeds.length > 0) {
-                activeNeeds.forEach(need => {
+            if (myOrgNeeds.length > 0) {
+                myOrgNeeds.forEach(need => {
                     const needItem = document.createElement('div');
                     needItem.style.display = 'flex';
                     needItem.style.alignItems = 'center';
@@ -3090,11 +4078,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetNeedForm() {
-        const formContainer = document.getElementById('need-form-card-container');
-        if (formContainer && needFormTemplate) {
-            formContainer.innerHTML = needFormTemplate;
-            bindManageNeedsEvents();
-        }
+        document.getElementById('need-form-name').value = '';
+        document.getElementById('need-form-desc').value = '';
+        document.getElementById('need-form-category').selectedIndex = 0;
+        document.getElementById('need-form-priority').selectedIndex = 0;
     }
 
     bindManageNeedsEvents();
@@ -3104,7 +4091,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnManagePhotos = document.getElementById('btn-manage-my-org-photos');
         if (btnManagePhotos) {
             btnManagePhotos.addEventListener('click', () => {
-                showScreen('manage-photos');
+                console.warn("ALERT PROXIMA ETAPA disparado desde:", "btn-manage-my-org-photos");
+                alert('Esta función se conectará en la próxima etapa.');
             });
         }
 
@@ -3435,11 +4423,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const btnManageMembers = document.getElementById('btn-manage-my-org-members');
             if (btnManageMembers) {
                 btnManageMembers.addEventListener('click', () => {
-                    renderMyOrgMembers();
-                    // Ensure views are reset
-                    document.getElementById('members-list-view').style.display = 'block';
-                    document.getElementById('member-form-view').style.display = 'none';
-                    showScreen('manage-members');
+                    console.warn("ALERT PROXIMA ETAPA disparado desde:", "btn-manage-my-org-members");
+                    alert('Esta función se conectará en la próxima etapa.');
                 });
             }
 
@@ -3745,6 +4730,42 @@ document.addEventListener('DOMContentLoaded', () => {
     bindManageMembersEvents();
     renderMyOrgMembers();
 
+    function populateProfileData() {
+        // TEMPORAL: hasta implementar login real/MongoDB, usamos user_id = 1 como usuario actual.
+        const CURRENT_USER_ID = window.INJECTED_DATA.current_user?.supabase_user_id || 1;
+        console.log("Perfil - CURRENT_USER_ID:", CURRENT_USER_ID);
+        
+        const users = window.INJECTED_DATA && window.INJECTED_DATA.users ? window.INJECTED_DATA.users : [];
+        console.log("Perfil - users:", users);
+
+        const currentUser = users.find(u => Number(u.user_id) === CURRENT_USER_ID);
+        console.log("Perfil - currentUser:", currentUser);
+
+        const nameDisplay = document.getElementById('profile-user-name');
+        const emailDisplay = document.getElementById('profile-user-email');
+        let badgeDisplay = null;
+        if (nameDisplay && nameDisplay.nextElementSibling && nameDisplay.nextElementSibling.classList.contains('status-badge-custom')) {
+            badgeDisplay = nameDisplay.nextElementSibling;
+        }
+
+        if (currentUser) {
+            if (nameDisplay) nameDisplay.textContent = currentUser.full_name || 'Sin nombre';
+            if (emailDisplay) emailDisplay.textContent = currentUser.email || 'Sin email';
+            if (badgeDisplay) {
+                badgeDisplay.textContent = currentUser.role || 'Sin rol';
+                badgeDisplay.style.display = '';
+            }
+        } else {
+            if (nameDisplay) nameDisplay.textContent = 'No se encontró el usuario actual.';
+            if (emailDisplay) emailDisplay.textContent = '';
+            if (badgeDisplay) badgeDisplay.style.display = 'none';
+        }
+    }
+
+    populateProfileData();
+
+
+
     function bindProfileEvents() {
         // Edit Profile transition from Screen 6.1
         const btnEditProfile = document.getElementById('btn-edit-profile');
@@ -3768,13 +4789,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (emailInput) emailInput.value = emailText.textContent;
                 }
                 
-                // Clear password fields on entry
-                const currPass = document.getElementById('edit-profile-curr-pass');
-                const newPass = document.getElementById('edit-profile-new-pass');
-                const confPass = document.getElementById('edit-profile-conf-pass');
-                if (currPass) currPass.value = '';
-                if (newPass) newPass.value = '';
-                if (confPass) confPass.value = '';
+                // Password fields feature removed for demo
 
                 showScreen('edit-profile');
             });
@@ -3809,38 +4824,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const nameVal = nameInput ? nameInput.value.trim() : '';
                 const lastnameVal = lastnameInput ? lastnameInput.value.trim() : '';
-                const emailVal = emailInput ? emailInput.value.trim() : '';
 
                 if (!nameVal) {
                     alert('Por favor ingresá un nombre.');
                     return;
                 }
-                if (!emailVal) {
-                    alert('Por favor ingresá un email válido.');
-                    return;
-                }
 
-                // Check passwords if they entered any
-                const newPass = document.getElementById('edit-profile-new-pass');
-                const confPass = document.getElementById('edit-profile-conf-pass');
-                if (newPass && confPass && newPass.value) {
-                    if (newPass.value !== confPass.value) {
-                        alert('Las contraseñas nuevas no coinciden.');
-                        return;
-                    }
-                }
+                // Password check removed for demo
 
                 // Show confirmation message
                 alert('Perfil actualizado correctamente.');
 
                 // Dynamically update Screen 6.1 elements
                 const nameDisplay = document.getElementById('profile-user-name');
-                const emailDisplay = document.getElementById('profile-user-email');
                 if (nameDisplay) {
                     nameDisplay.textContent = `${nameVal} ${lastnameVal}`.trim();
-                }
-                if (emailDisplay) {
-                    emailDisplay.textContent = emailVal;
                 }
 
                 // Navigate back
@@ -3958,7 +4956,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const grid = document.getElementById('favorites-grid');
         if (!grid) return;
 
-        // Service icon config — same circle classes and SVGs as Screen 2.0 and 2.2
+        // Service icon config
         const serviceConfig = {
             'Duchas': {
                 circleClass: 'circle-duchas',
@@ -4004,21 +5002,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         grid.innerHTML = '';
 
-        if (favoriteOrganizations.length === 0) {
+        const currentUserFavorites = window.getCurrentUserFavorites();
+        
+        console.log("CURRENT_USER_ID:", window.getCurrentUserId());
+        console.log("Perfil - favorites_full:", window.INJECTED_DATA?.favorites_full);
+        console.log("Perfil - currentUserFavorites:", currentUserFavorites);
+
+        if (currentUserFavorites.length === 0) {
             grid.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1.5rem; color: var(--text-muted); font-size: 1.15rem; font-style: italic; background-color: var(--bg-card); border-radius: 24px; border: 1.5px dashed rgba(76, 67, 61, 0.15); width: 100%;">
-                    No tenés organizaciones guardadas en tus favoritos.
+                    Todavía no agregaste favoritos.
                 </div>
             `;
             return;
         }
 
-        favoriteOrganizations.forEach(org => {
+        currentUserFavorites.forEach(fav => {
+            const orgId = fav.org_id;
+            
+            // Find services
+            const orgServicesFull = (window.INJECTED_DATA.services_full || []).filter(s => Number(s.org_id) === Number(orgId));
+            const orgServices = orgServicesFull.map(s => s.service_type);
+
+            // Find rating and status
+            let status = 'Activo'; // Fallback
+            let ratingText = '';
+            const ratingInfo = (window.INJECTED_DATA.organizations_with_rating || []).find(o => Number(o.org_id) === Number(orgId));
+            if (ratingInfo) {
+                status = ratingInfo.status === 'active' ? 'Activo' : 'Inactivo';
+                if (ratingInfo.total_reviews > 0 && ratingInfo.average_rating !== null) {
+                    ratingText = Number(ratingInfo.average_rating).toFixed(1);
+                }
+            }
+
             const card = document.createElement('article');
             card.className = 'org-card';
 
             // Build multi-service icon badges
-            const orgServices = org.services && org.services.length > 0 ? org.services : [];
             const servicesBadgesMarkup = orgServices.map(svc => {
                 const cfg = serviceConfig[svc] || serviceConfig['Duchas'];
                 return `
@@ -4033,28 +5053,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Status color
             let statusColor = '#3ca374';
-            if (org.status === 'Suspendido') statusColor = '#cf5e28';
-            else if (org.status === 'Cupo completo') statusColor = '#d87b1a';
-            else if (org.status === 'Inactivo') statusColor = 'var(--text-muted)';
+            if (status === 'Suspendido') statusColor = '#cf5e28';
+            else if (status === 'Cupo completo') statusColor = '#d87b1a';
+            else if (status === 'Inactivo') statusColor = 'var(--text-muted)';
 
             card.innerHTML = `
                 <div class="org-card-header" style="flex-direction:column; align-items:flex-start; gap:0.75rem;">
                     <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                        <span style="font-size:0.85rem; font-weight:700; color:${statusColor};">• ${org.status}</span>
+                        <span style="font-size:0.85rem; font-weight:700; color:${statusColor};">• ${status}</span>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:0.75rem; width:100%;">
                         ${servicesBadgesMarkup}
                     </div>
                 </div>
                 <div class="org-card-body">
-                    <h3 class="org-name">${org.name}</h3>
-                    <div class="org-rating" aria-label="Calificación ${org.rating} estrellas">
+                    <h3 class="org-name">${fav.organization_name}</h3>
+                    ${ratingText ? `
+                    <div class="org-rating" aria-label="Calificación ${ratingText} estrellas">
                         <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                         </svg>
-                        <span class="rating-value">${org.rating}</span>
+                        <span class="rating-value">${ratingText}</span>
                     </div>
-                    <p class="org-description">${org.description}</p>
+                    ` : `
+                    <div class="org-rating" aria-label="Sin reseñas">
+                        <span class="rating-count" style="margin-left:0; font-style:italic;">Sin reseñas</span>
+                    </div>
+                    `}
+                    <p class="org-description">${fav.description || ''}</p>
+                    <p class="org-description" style="font-size:0.8rem; margin-top:0.5rem;">📍 ${fav.address || ''}</p>
                 </div>
                 <div class="org-card-footer" style="display: flex; gap: 0.75rem; width: 100%;">
                     <button class="details-btn" style="flex-grow: 1; margin: 0;">Ver detalles</button>
@@ -4066,41 +5093,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // Bind click to "Ver detalles" button — look up in main org db
+            // Bind click to "Ver detalles" button
             const detailsBtn = card.querySelector('.details-btn');
             if (detailsBtn) {
                 detailsBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    // Use the first service to look up in the org db
                     const primaryService = orgServices[0] || '';
-                    const orgsInCategory = organizationsByService[primaryService];
-                    const mainOrgData = orgsInCategory ? orgsInCategory.find(o => o.name === org.name) : null;
-                    detailScreenSource = 'favorites';
-                    if (mainOrgData) {
-                        showOrganizationDetail(mainOrgData, primaryService);
+                    if (ratingInfo) {
+                        detailScreenSource = 'favorites';
+                        showOrganizationDetail(ratingInfo, primaryService);
                     } else {
-                        // Fallback using mock data if not found in db
-                        const fallbackOrg = {
-                            name: org.name,
-                            rating: org.rating,
-                            reviews: '45',
-                            description: org.description,
-                            tags: ['Favorito', 'Activo'],
-                            status: org.status,
-                            services: org.services || [],
-                            address: org.name === 'Parroquia San José' ? 'Calle Falsa 123, Barrio San Martín' : 'Av. de los Trabajadores 456',
-                            phone: '+54 11 4567-8901',
-                            social: '@comunitas',
-                            website: 'www.comunitas.org',
-                            serviceInfo: org.description,
-                            schedule: 'Lunes a Viernes de 09:00 a 17:00 hs',
-                            needs: ['Alimentos', 'Voluntarios'],
-                            gallery: ['assets/gallery_dining_room.png'],
-                            reviewsList: [
-                                { author: 'Juan Pérez', rating: '5', tags: ['Buen trato', 'Personal amable'], date: 'Hace 1 semana' }
-                            ]
-                        };
-                        showOrganizationDetail(fallbackOrg, primaryService);
+                        alert("No se encontraron detalles para esta organización.");
                     }
                 });
             }
@@ -4108,11 +5111,45 @@ document.addEventListener('DOMContentLoaded', () => {
             // Bind click to "Quitar favorito" button
             const removeBtn = card.querySelector('.btn-remove-fav');
             if (removeBtn) {
-                removeBtn.addEventListener('click', (e) => {
+                removeBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    alert("Organización quitada de favoritos.");
-                    favoriteOrganizations = favoriteOrganizations.filter(o => o.name !== org.name);
-                    renderFavorites();
+                    
+                    const CURRENT_USER_ID = window.getCurrentUserId();
+
+                    console.log("Perfil - quitar favorito orgId:", orgId);
+                    console.log("Perfil - payload remove_favorite:", {
+                        p_user_id: CURRENT_USER_ID,
+                        p_org_id: orgId
+                    });
+                    console.log("Perfil - favoritos antes:", window.INJECTED_DATA.favorites_full);
+
+                    const creds = window.INJECTED_DATA.credentials;
+                    if (!creds || !window.supabase) {
+                        alert('Error: Cliente Supabase no inicializado.');
+                        return;
+                    }
+                    const supabaseClient = window.supabase.createClient(creds.url, creds.anon_key);
+                    
+                    removeBtn.disabled = true;
+                    
+                    const { error } = await supabaseClient.rpc('remove_favorite', {
+                        p_user_id: CURRENT_USER_ID,
+                        p_org_id: orgId
+                    });
+                    
+                    if (error) {
+                        console.error(error);
+                        alert('No se pudo quitar de favoritos.');
+                        removeBtn.disabled = false;
+                    } else {
+                        window.INJECTED_DATA.favorites_full = (window.INJECTED_DATA.favorites_full || []).filter(fav => 
+                            !(Number(fav.user_id) === Number(CURRENT_USER_ID) && Number(fav.org_id) === Number(orgId))
+                        );
+                        
+                        console.log("Perfil - favoritos después:", window.INJECTED_DATA.favorites_full);
+                        alert('Organización quitada de favoritos.');
+                        renderFavorites();
+                    }
                 });
             }
 
@@ -4152,28 +5189,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!listView) return;
 
         listView.innerHTML = '';
+        
+        const currentUserReviews = window.getCurrentUserReviews();
+        
+        console.log("CURRENT_USER_ID:", window.getCurrentUserId());
+        console.log("Perfil - reviews_full:", window.INJECTED_DATA?.reviews_full);
+        console.log("Perfil - currentUserReviews:", currentUserReviews);
 
-        if (userReviews.length === 0) {
+        if (currentUserReviews.length === 0) {
             listView.innerHTML = `
                 <div style="text-align: center; padding: 4rem 1.5rem; color: var(--text-muted); font-size: 1.15rem; font-style: italic; background-color: var(--bg-card); border-radius: 24px; border: 1.5px dashed rgba(76, 67, 61, 0.15); width: 100%;">
-                    No realizaste ninguna evaluación aún.
+                    Todavía no realizaste reseñas.
                 </div>
             `;
             return;
         }
 
-        userReviews.forEach((review, index) => {
+        currentUserReviews.forEach(review => {
             const card = document.createElement('article');
             card.className = 'manage-service-card';
             
-            const tagsMarkup = review.tags.map(t => `<span class="org-list-tag">${t}</span>`).join('');
+            let tagsMarkup = '<span class="org-list-tag" style="font-style: italic; color: var(--text-muted); background: none; padding: 0; border: none;">Sin etiquetas</span>';
+            if (review.tags && Array.isArray(review.tags) && review.tags.length > 0) {
+                tagsMarkup = review.tags.map(t => `<span class="org-list-tag">${t}</span>`).join('');
+            } else if (typeof review.tags === 'string' && review.tags.trim() !== '') {
+                tagsMarkup = review.tags.split(',').map(t => `<span class="org-list-tag">${t.trim()}</span>`).join('');
+            }
+            
+            let displayDate = 'Sin fecha';
+            if (review.created_at) {
+                try {
+                    const d = new Date(review.created_at);
+                    if (!isNaN(d.getTime())) {
+                        displayDate = d.toLocaleDateString();
+                    }
+                } catch(e) {}
+            }
             
             card.innerHTML = `
                 <div class="manage-service-info" style="width: 100%;">
                     <div class="manage-service-header" style="justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
-                        <h4 class="manage-service-name" style="font-size: 1.25rem; margin: 0;">${review.name}</h4>
+                        <h4 class="manage-service-name" style="font-size: 1.25rem; margin: 0;">${review.organization_name || 'Organización desconocida'}</h4>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--brand-rust); background-color: #fcefe9; padding: 0.25rem 0.65rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">${review.service}</span>
                             <span style="color: var(--brand-mustard); font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.25rem;">
                                 <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; color: var(--brand-mustard);">
                                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
@@ -4194,32 +5251,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             <line x1="8" y1="2" x2="8" y2="6"></line>
                             <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
-                        <span>Evaluado el: ${review.date}</span>
+                        <span>Evaluado el: ${displayDate}</span>
                     </div>
                 </div>
-                <div class="manage-service-actions" style="margin-top: 1rem; border-top: 1px solid #f5ede6; padding-top: 1rem; display: flex; gap: 0.75rem; justify-content: flex-end;">
-                    <button class="request-card-btn btn-edit-review" data-index="${index}" style="width: auto; padding-left: 1.5rem; padding-right: 1.5rem;">Editar</button>
-                    <button class="request-card-btn btn-delete-review" data-index="${index}" style="width: auto; padding-left: 1.5rem; padding-right: 1.5rem; color: #a64b58; background-color: #fbeeef; border-color: rgba(166,75,88,0.15);">Eliminar</button>
-                </div>
             `;
-
-            // Bind click to Edit button
-            const editBtn = card.querySelector('.btn-edit-review');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    openEditReviewForm(index);
-                });
-            }
-
-            // Bind click to Delete button
-            const deleteBtn = card.querySelector('.btn-delete-review');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', () => {
-                    alert("Reseña eliminada correctamente.");
-                    userReviews.splice(index, 1);
-                    renderReviews();
-                });
-            }
 
             listView.appendChild(card);
         });
@@ -4230,46 +5265,87 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!listView) return;
 
         listView.innerHTML = '';
+        
+        const orgsAll = (window.INJECTED_DATA && window.INJECTED_DATA.suggested_organizations_full) ? window.INJECTED_DATA.suggested_organizations_full : [];
+        const svcsAll = (window.INJECTED_DATA && window.INJECTED_DATA.suggested_services_full) ? window.INJECTED_DATA.suggested_services_full : [];
+        
+        const orgs = window.getCurrentUserSuggestions();
 
-        Object.keys(mockSuggestions).forEach(id => {
-            const sug = mockSuggestions[id];
+        if (orgs.length === 0) {
+            listView.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Todavía no realizaste sugerencias.</div>';
+            return;
+        }
+
+        orgs.forEach(org => {
+            const orgServices = svcsAll.filter(s => Number(s.sugg_id) === Number(org.sugg_id));
+            
+            let servicesHtml = '';
+            if (orgServices.length > 0) {
+                servicesHtml = orgServices.map(s => `
+                    <div style="background: rgba(0,0,0,0.02); padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem;">
+                        <strong>${s.service_type || 'Servicio'}</strong> - ${s.title || ''}<br>
+                        ${s.description ? `<span style="color:var(--text-muted)">${s.description}</span><br>` : ''}
+                        ${s.schedule ? `<span style="color:var(--text-muted)">Horario: ${s.schedule}</span><br>` : ''}
+                        ${s.status ? `<span style="color:var(--text-muted)">Estado: ${s.status === 'active' ? 'Activo' : s.status}</span>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                servicesHtml = '<p style="color:var(--text-muted); font-size:0.9rem; font-style:italic;">No hay servicios cargados para esta sugerencia.</p>';
+            }
+            
             const card = document.createElement('article');
-            card.className = 'manage-service-card';
+            card.className = 'request-list-card';
+            card.style.flexDirection = 'column';
+            card.style.alignItems = 'stretch';
+            
+            let dateStr = 'No disponible';
+            if (org.created_at) {
+                const d = new Date(org.created_at);
+                dateStr = d.toLocaleDateString();
+            }
+
+            let statusBadgeClass = 'pending';
+            let statusLabel = 'Pendiente';
+            if (org.validation_status === 'approved') {
+                statusBadgeClass = 'approved';
+                statusLabel = 'Aprobada';
+            } else if (org.validation_status === 'rejected') {
+                statusBadgeClass = 'rejected';
+                statusLabel = 'Rechazada';
+            }
+
+            let rejectionHtml = '';
+            if (org.validation_status === 'rejected' && org.rejection_reason) {
+                rejectionHtml = `<div style="background: #ffebee; color: #c62828; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem;"><strong>Motivo de rechazo:</strong> ${org.rejection_reason}</div>`;
+            }
+
             card.innerHTML = `
-                <div class="manage-service-info" style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.5rem;">
-                    <h4 class="manage-service-name" style="font-size: 1.25rem; margin: 0; color: var(--brand-charcoal); font-weight: 700;">${sug.name}</h4>
+                <div class="request-card-info" style="width: 100%;">
+                    <div class="request-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 class="request-card-name" style="margin: 0;">${org.name || 'Sin nombre'}</h3>
+                        <span class="status-badge-custom ${statusBadgeClass}">${statusLabel}</span>
+                    </div>
+                    <p class="request-card-desc" style="margin-bottom: 0.5rem; font-weight: 500;">${org.description || 'No disponible'}</p>
                     
-                    <p class="manage-service-desc" style="font-size: 1.05rem; color: var(--brand-charcoal); margin: 0.25rem 0 0.5rem 0;">
-                        ${sug.desc}
-                    </p>
-                    
-                    <div class="manage-service-meta" style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; color:var(--brand-rust);">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        <span>Sugerido el: ${sug.date}</span>
+                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.6;">
+                        <div><strong>Sugerida por:</strong> ${org.suggested_by || 'No disponible'}</div>
+                        <div><strong>Dirección:</strong> ${org.address || 'No disponible'}</div>
+                        <div><strong>Teléfono:</strong> ${org.phone || 'No disponible'}</div>
+                        <div><strong>Redes/contacto:</strong> ${org.socials || 'No disponible'}</div>
+                        <div><strong>Latitud/Longitud:</strong> ${org.latitude || '-'}, ${org.longitude || '-'}</div>
+                        <div><strong>Fecha de creación:</strong> ${dateStr}</div>
+                    </div>
+
+                    ${rejectionHtml}
+
+                    <div style="margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 1rem; margin-bottom: 1rem;">
+                        <h4 style="font-size: 1rem; color: var(--brand-charcoal); margin: 0 0 0.5rem 0;">Servicios asociados</h4>
+                        ${servicesHtml}
                     </div>
                 </div>
-                <div class="manage-service-actions" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 0.75rem; flex-shrink: 0; min-width: 160px; margin: 0; border: none; padding: 0;">
-                    <span class="status-badge-custom ${sug.status}" style="font-size: 0.85rem; padding: 0.35rem 0.85rem; border-radius: 30px; font-weight: 700; text-align: center; display: inline-block; width: 100%; box-sizing: border-box; white-space: nowrap;">${sug.statusLabel}</span>
-                    <button class="request-card-btn view-sug-detail-btn" data-id="${id}" style="width: 100%; padding: 0.75rem 1.5rem; margin: 0; text-align: center; white-space: nowrap;">Ver solicitud</button>
-                </div>
             `;
+            
             listView.appendChild(card);
-        });
-
-        // Bind clicks for the newly rendered buttons
-        const detailBtns = listView.querySelectorAll('.view-sug-detail-btn');
-        detailBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const reqId = btn.getAttribute('data-id');
-                requestDetailSource = 'suggestions';
-                populateRequestDetail(reqId);
-                showScreen('request-detail');
-            });
         });
     }
 
@@ -4380,6 +5456,146 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeEditReviewForm();
                 renderReviews();
             });
+        }
+    }
+
+    // Population function for Mi Organización
+    function populateMyOrgDashboard() {
+        if (!window.INJECTED_DATA) return;
+
+        const dashboard = document.querySelector('#screen-my-org .my-org-dashboard');
+        if (!window.canAccessMyOrganization()) {
+            if (dashboard) {
+                dashboard.innerHTML = '<p style="color: var(--text-muted); font-size: 1.1rem; text-align: center; margin-top: 2rem;">No tenés una organización asociada.</p>';
+            }
+            return;
+        }
+        
+        const memberships = window.getCurrentUserMemberships();
+        const myOrgId = Number(memberships[0].org_id);
+
+        // 1. Populate General Info (from organizations_with_rating)
+        if (window.INJECTED_DATA.organizations_with_rating) {
+            const orgInfo = window.INJECTED_DATA.organizations_with_rating.find(o => Number(o.org_id) === myOrgId);
+            if (orgInfo) {
+                document.getElementById('my-org-header-name').textContent = orgInfo.name || 'No disponible';
+                document.getElementById('my-org-header-desc').textContent = orgInfo.description || 'No disponible';
+                document.getElementById('my-org-info-address').textContent = orgInfo.address || 'No disponible';
+                document.getElementById('my-org-info-phone').textContent = orgInfo.phone || 'No disponible';
+                document.getElementById('my-org-info-instagram').textContent = orgInfo.instagram || 'No disponible';
+                
+                const websiteEl = document.getElementById('my-org-info-website');
+                if (orgInfo.website) {
+                    websiteEl.textContent = orgInfo.website;
+                    websiteEl.href = orgInfo.website.startsWith('http') ? orgInfo.website : `https://${orgInfo.website}`;
+                } else {
+                    websiteEl.textContent = 'No disponible';
+                    websiteEl.removeAttribute('href');
+                }
+                
+                document.getElementById('my-org-info-lat').textContent = orgInfo.latitude || 'No disponible';
+                document.getElementById('my-org-info-lng').textContent = orgInfo.longitude || 'No disponible';
+
+                // Status and Rating
+                const statusEl = document.getElementById('my-org-header-status');
+                if (statusEl) {
+                    statusEl.textContent = orgInfo.status === 'active' ? 'Activa' : (orgInfo.status || 'No disponible');
+                    statusEl.className = orgInfo.status === 'active' ? 'status-badge-custom approved' : 'status-badge-custom pending';
+                }
+
+                const ratingEl = document.getElementById('my-org-header-rating');
+                if (ratingEl) {
+                    if (orgInfo.total_reviews > 0 && orgInfo.average_rating) {
+                        ratingEl.innerHTML = `⭐ ${Number(orgInfo.average_rating).toFixed(1)} <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);margin-left:4px;">(${orgInfo.total_reviews})</span>`;
+                    } else {
+                        ratingEl.innerHTML = `<span style="font-style:italic; font-size:0.85rem; font-weight:400; color:var(--text-light);">Sin reseñas</span>`;
+                    }
+                }
+            }
+        }
+
+        // 2. Populate Services
+        const servicesList = document.getElementById('my-org-services-list');
+        if (servicesList && window.INJECTED_DATA.services_full) {
+            const orgServices = window.INJECTED_DATA.services_full.filter(s => Number(s.org_id) === myOrgId);
+            servicesList.innerHTML = '';
+            if (orgServices.length === 0) {
+                servicesList.innerHTML = '<p style="color:var(--text-light); font-size:0.9rem;">No hay servicios activos publicados.</p>';
+            } else {
+                orgServices.forEach(srv => {
+                    const statusText = srv.service_status === 'active' ? 'Activo' : 'Inactivo';
+                    const statusClass = srv.service_status === 'active' ? 'approved' : 'pending';
+                    servicesList.innerHTML += `
+                        <div class="my-org-service-item" style="border:1px solid #f5ede6; padding:0.75rem; border-radius:8px; width:100%; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h4 style="margin:0; font-size:0.95rem; color:var(--text-dark);">${srv.title || 'Sin título'}</h4>
+                                <p style="margin:0.25rem 0 0 0; font-size:0.8rem; color:var(--text-light);">${srv.service_type || ''} • ${srv.schedule || 'Sin horario'}</p>
+                            </div>
+                            <span class="status-badge-custom ${statusClass}" style="font-size:0.7rem; padding:0.2rem 0.5rem;">${statusText}</span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // 3. Populate Needs
+        const needsList = document.getElementById('my-org-needs-list');
+        if (needsList && window.INJECTED_DATA.active_needs) {
+            const orgNeeds = window.INJECTED_DATA.active_needs.filter(n => Number(n.org_id) === myOrgId);
+            needsList.innerHTML = '';
+            if (orgNeeds.length === 0) {
+                needsList.innerHTML = '<p style="color:var(--text-light); font-size:0.9rem;">No hay necesidades activas publicadas.</p>';
+            } else {
+                orgNeeds.forEach(need => {
+                    let priorityColor = '#CF5E28'; // high
+                    let priorityText = 'Alta';
+                    if (need.priority === 'medium') { priorityColor = '#EFA52E'; priorityText = 'Media'; }
+                    if (need.priority === 'low') { priorityColor = '#4C433D'; priorityText = 'Baja'; }
+                    needsList.innerHTML += `
+                        <div class="my-org-need-item" style="border:1px solid #f5ede6; padding:0.75rem; border-radius:8px; display:flex; flex-direction:column; gap:0.25rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h4 style="margin:0; font-size:0.95rem; color:var(--text-dark);">${need.title || 'Sin título'}</h4>
+                                <span style="background-color:${priorityColor}; color:white; font-size:0.7rem; padding:0.15rem 0.5rem; border-radius:12px; font-weight:600;">${priorityText}</span>
+                            </div>
+                            <p style="margin:0; font-size:0.85rem; color:var(--text-light);">${need.description || ''}</p>
+                            <p style="margin:0; font-size:0.75rem; color:var(--brand-mustard); font-weight:600;">${need.category || ''}</p>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // 4. Populate Members
+        const membersList = document.getElementById('my-org-members-list');
+        if (membersList) {
+            membersList.innerHTML = '';
+            
+            let orgMembers = [];
+            if (window.INJECTED_DATA.organization_members_full && window.INJECTED_DATA.organization_members_full.length > 0) {
+                orgMembers = window.INJECTED_DATA.organization_members_full.filter(m => Number(m.org_id) === myOrgId && m.is_active === true);
+            }
+
+            if (orgMembers.length === 0) {
+                membersList.innerHTML = '<p style="color:var(--text-light); font-size:0.9rem; font-style:italic;">No se pudieron cargar los miembros de la organización.</p>';
+            } else {
+                orgMembers.forEach(mem => {
+                    let userName = mem.full_name || "Usuario Desconocido";
+
+                    const roleText = mem.member_role === 'coordinador' ? 'Coordinador' : (mem.member_role ? mem.member_role.charAt(0).toUpperCase() + mem.member_role.slice(1) : 'Voluntario');
+                    const roleClass = mem.member_role === 'coordinador' ? 'approved' : 'pending';
+                    membersList.innerHTML += `
+                        <div class="my-org-member-item" style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid #f5ede6;">
+                            <div style="width:36px; height:36px; border-radius:50%; background-color:#e2d3c5; display:flex; justify-content:center; align-items:center; color:white; font-weight:600;">
+                                ${userName.charAt(0).toUpperCase()}
+                            </div>
+                            <div style="flex:1;">
+                                <h4 style="margin:0; font-size:0.95rem; color:var(--text-dark);">${userName}</h4>
+                                <span class="status-badge-custom ${roleClass}" style="font-size:0.7rem; padding:0.1rem 0.4rem; margin-top:0.25rem;">${roleText}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
         }
     }
 

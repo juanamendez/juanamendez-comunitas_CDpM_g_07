@@ -1,3 +1,4 @@
 # Dependencias de Python para COMUNITAS
 streamlit
 supabase
+pymongo

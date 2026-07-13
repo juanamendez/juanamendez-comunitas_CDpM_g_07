@@ -9,10 +9,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css?v=3">
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -153,42 +155,8 @@
                     <!-- Recommended Organizations Section -->
                     <div class="recommendations-container">
                         <h2 class="section-title">Organizaciones recomendadas</h2>
-                        
-
-                            <!-- Card 4: Fundación Abrigo -->
-                            <article class="org-card">
-                                <div class="org-card-header">
-                                    <div class="service-badge category-education">
-                                        <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                                        </svg>
-                                        <span>Alojamiento</span>
-                                    </div>
-                                    <span class="status-badge open">Activo</span>
-                                </div>
-                                <div class="org-card-body">
-                                    <div class="org-illustration-circle circle-education">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="card-center-icon">
-                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                            <path d="M12 17s-3-2-3-3.67A1.67 1.67 0 0 1 10.67 11.5c.78 0 1.33.6 1.33.6s.55-.6 1.33-.6a1.67 1.67 0 0 1 1.67 1.83C15 15 12 17 12 17z" fill="currentColor"></path>
-                                        </svg>
-                                    </div>
-                                    <h3 class="org-name">Fundación Abrigo</h3>
-                                    <div class="org-rating" aria-label="Calificación 4.5 estrellas de 64 opiniones">
-                                        <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor">
-                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                        </svg>
-                                        <span class="rating-value">4.5</span>
-                                        <span class="rating-count">(64 reseñas)</span>
-                                    </div>
-                                    <p class="org-description">Alojamiento seguro y contención para personas en situación de calle.</p>
-                                </div>
-                                <div class="org-card-footer">
-                                    <button class="details-btn">Ver detalles</button>
-                                </div>
-                            </article>
-
+                        <div class="recommendations-grid" id="recommendations-grid">
+                            <!-- Populated dynamically by app.js -->
                         </div>
                     </div>
                 </section>
@@ -296,17 +264,7 @@
                     <div class="suggest-container" style="margin-top: 1.5rem; width: 100%; max-width: 100%;">
                         <div class="suggest-form-card" style="padding: 1rem 1.5rem; margin-bottom: 1.5rem; border-radius: 16px;">
                             <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; width: 100%;">
-                                <!-- Estado -->
-                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
-                                    <label class="form-label" for="filter-service-status" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Estado ▼</label>
-                                    <select class="form-input" id="filter-service-status" style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
-                                        <option value="All">Todos</option>
-                                        <option value="Activo">Activo</option>
-                                        <option value="Suspendido">Suspendido</option>
-                                        <option value="Cupo completo">Cupo completo</option>
-                                        <option value="Inactivo">Inactivo</option>
-                                    </select>
-                                </div>
+
                                 
                                 <!-- Calificación -->
                                 <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
@@ -319,17 +277,7 @@
                                     </select>
                                 </div>
                                 
-                                <!-- Horario -->
-                                <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
-                                    <label class="form-label" for="filter-service-schedule" style="font-size: 0.85rem; font-weight: 700; margin: 0;">Horario ▼</label>
-                                    <select class="form-input" id="filter-service-schedule" style="height: 38px; padding: 0.25rem 0.75rem; font-size: 0.9rem; border-radius: 8px;">
-                                        <option value="All">Todos</option>
-                                        <option value="now">Disponible ahora</option>
-                                        <option value="morning">Mañana</option>
-                                        <option value="afternoon">Tarde</option>
-                                        <option value="night">Noche</option>
-                                    </select>
-                                </div>
+
                                 
                                 <!-- Distancia -->
                                 <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 0.25rem;">
@@ -468,22 +416,12 @@
                                         <span class="filter-label-text">Todos</span>
                                     </label>
                                     <label class="filter-checkbox-label">
-                                        <input type="checkbox" name="status" value="Activo">
+                                        <input type="checkbox" name="status" value="active">
                                         <span class="custom-checkbox"></span>
                                         <span class="filter-label-text">Activo</span>
                                     </label>
                                     <label class="filter-checkbox-label">
-                                        <input type="checkbox" name="status" value="Suspendido">
-                                        <span class="custom-checkbox"></span>
-                                        <span class="filter-label-text">Suspendido</span>
-                                    </label>
-                                    <label class="filter-checkbox-label">
-                                        <input type="checkbox" name="status" value="Cupo completo">
-                                        <span class="custom-checkbox"></span>
-                                        <span class="filter-label-text">Cupo completo</span>
-                                    </label>
-                                    <label class="filter-checkbox-label">
-                                        <input type="checkbox" name="status" value="Inactivo">
+                                        <input type="checkbox" name="status" value="inactive">
                                         <span class="custom-checkbox"></span>
                                         <span class="filter-label-text">Inactivo</span>
                                     </label>
@@ -665,7 +603,7 @@
                                         <input type="text" class="form-input" id="suggest-phone" placeholder="Ej: +54 11 1234-5678">
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label" for="suggest-social">Redes sociales</label>
+                                        <label class="form-label" for="suggest-social">Redes sociales (opcional)</label>
                                         <input type="text" class="form-input" id="suggest-social" placeholder="Ej: @comedorrayito">
                                     </div>
                                 </div>
@@ -674,52 +612,22 @@
                             <!-- Section 2: Servicios que ofrece -->
                             <div class="form-group">
                                 <h3 class="form-section-title">Servicios que ofrece</h3>
-                                <div class="services-pills-grid">
-                                    <span class="service-pill" data-service="Comida">Comida</span>
-                                    <span class="service-pill" data-service="Duchas">Duchas</span>
-                                    <span class="service-pill" data-service="Atención médica">Atención médica</span>
-                                    <span class="service-pill" data-service="Apoyo escolar">Apoyo escolar</span>
-                                    <span class="service-pill" data-service="Ropa">Ropa</span>
-                                    <span class="service-pill" data-service="Alojamiento">Alojamiento</span>
-                                    <span class="service-pill" data-service="Asesoramiento legal">Asesoramiento legal</span>
-                                    <span class="service-pill" data-service="Asesoramiento laboral">Asesoramiento laboral</span>
+                                <div class="services-pills-grid" id="suggest-services-pills-container">
+                                    <!-- Dynamic service pills will be injected here from Supabase -->
                                 </div>
+                                <div id="suggest-services-details-container" style="display:flex; flex-direction:column; gap:1rem; margin-top:1.5rem;"></div>
                             </div>
                             
-                            <!-- Section 3: Horarios -->
-                            <div class="form-group">
-                                <h3 class="form-section-title">Horarios</h3>
-                                <div class="form-group">
-                                    <label class="form-label">¿Conocés los horarios?</label>
-                                    <div class="radio-options-group">
-                                        <label class="filter-radio-label">
-                                            <input type="radio" name="suggest-schedule-known" value="no" checked>
-                                            <span class="custom-radio"></span>
-                                            <span class="filter-label-text">No</span>
-                                        </label>
-                                        <label class="filter-radio-label">
-                                            <input type="radio" name="suggest-schedule-known" value="yes">
-                                            <span class="custom-radio"></span>
-                                            <span class="filter-label-text">Sí</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="form-group" id="suggest-schedule-container" style="display: none; margin-top: 1rem;">
-                                    <label class="form-label" for="suggest-schedule">Escribí los horarios conocidos</label>
-                                    <textarea class="form-textarea" id="suggest-schedule" placeholder="Ej: Lunes a Viernes de 12:00 a 14:00 hs…"></textarea>
-                                </div>
-                            </div>
-                            
-                            <!-- Section 4: Ubicación -->
+                            <!-- Section 3: Ubicación -->
                             <div class="form-group">
                                 <h3 class="form-section-title">Ubicación</h3>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label class="form-label" for="suggest-lat">Latitud (opcional)</label>
+                                        <label class="form-label" for="suggest-lat">Latitud</label>
                                         <input type="text" class="form-input" id="suggest-lat" placeholder="Ej: -34.603">
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label" for="suggest-lng">Longitud (opcional)</label>
+                                        <label class="form-label" for="suggest-lng">Longitud</label>
                                         <input type="text" class="form-input" id="suggest-lng" placeholder="Ej: -58.381">
                                     </div>
                                 </div>
@@ -1054,8 +962,8 @@
                                 <div class="my-org-header-info">
                                     <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
                                         <h2 class="my-org-name-title" id="my-org-header-name">Parroquia San José</h2>
-                                        <span class="status-badge-custom approved" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Activa</span>
-                                        <span style="font-size:1.05rem; color:var(--brand-mustard); font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;">⭐ 4.8</span>
+                                        <span id="my-org-header-status" class="status-badge-custom approved" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Activa</span>
+                                        <span id="my-org-header-rating" style="font-size:1.05rem; color:var(--brand-mustard); font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;">⭐ 4.8</span>
                                     </div>
                                     <p class="my-org-description-text" id="my-org-header-desc">
                                         Organización comunitaria que ofrece duchas, ropa limpia y acompañamiento para personas en situación de vulnerabilidad.
@@ -1110,43 +1018,28 @@
                                     <button class="my-org-card-btn eval-secondary-btn" id="btn-edit-my-org-info">Editar información</button>
                                 </div>
 
-                                <!-- 5. Fotos Card -->
+                                <!-- 6. Miembros Card -->
                                 <div class="my-org-card">
                                     <div class="my-org-card-title-row">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="9" cy="7" r="4"></circle>
+                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                                         </svg>
-                                        <h3>Fotos</h3>
+                                        <h3>Miembros</h3>
                                     </div>
-                                    <div class="my-org-photos-preview" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.75rem; margin:0.25rem 0;">
-                                        <!-- Photo placeholder 1 -->
-                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #f5ede6 0%, #e2d3c5 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                <polyline points="21 15 16 10 5 21"></polyline>
-                                            </svg>
+                                    <div class="my-org-members-list" id="my-org-members-list" style="display:flex; flex-direction:column; gap:0.75rem; margin:0.5rem 0;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">María García</span>
+                                            <span style="font-size:0.8rem; font-weight:700; color:var(--brand-rust); background-color:#fcefe9; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Administradora</span>
                                         </div>
-                                        <!-- Photo placeholder 2 -->
-                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #fcefe9 0%, #f7dcd0 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                <polyline points="21 15 16 10 5 21"></polyline>
-                                            </svg>
-                                        </div>
-                                        <!-- Photo placeholder 3 -->
-                                        <div class="photo-placeholder-box" style="aspect-ratio:1.33; border-radius:12px; background:linear-gradient(135deg, #fdf2e4 0%, #fadfb9 100%); display:flex; align-items:center; justify-content:center; color:rgba(76, 67, 61, 0.35); border:1px solid rgba(76, 67, 61, 0.05);">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px; height:22px;">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                <polyline points="21 15 16 10 5 21"></polyline>
-                                            </svg>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
+                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">Juan Pérez</span>
+                                            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); background-color:#f5ede6; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Editor</span>
                                         </div>
                                     </div>
-                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-photos" style="margin-top: 1rem;">Administrar fotos</button>
+                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-members" style="margin-top: 1rem;">Administrar miembros</button>
                                 </div>
 
                             </div>
@@ -1196,30 +1089,6 @@
                                         </div>
                                     </div>
                                     <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-needs" style="margin-top: 1rem;">Administrar necesidades</button>
-                                </div>
-
-                                <!-- 6. Miembros Card -->
-                                <div class="my-org-card">
-                                    <div class="my-org-card-title-row">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="9" cy="7" r="4"></circle>
-                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                        </svg>
-                                        <h3>Miembros</h3>
-                                    </div>
-                                    <div class="my-org-members-list" id="my-org-members-list" style="display:flex; flex-direction:column; gap:0.75rem; margin:0.5rem 0;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">María García</span>
-                                            <span style="font-size:0.8rem; font-weight:700; color:var(--brand-rust); background-color:#fcefe9; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Administradora</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">Juan Pérez</span>
-                                            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); background-color:#f5ede6; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Editor</span>
-                                        </div>
-                                    </div>
-                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-members" style="margin-top: 1rem;">Administrar miembros</button>
                                 </div>
                             </div>
                             
@@ -1365,8 +1234,6 @@
                                     <label class="form-label" for="service-form-status">Estado</label>
                                     <select class="form-input" id="service-form-status" style="padding: 0 0.75rem;">
                                         <option value="active-status">Activo</option>
-                                        <option value="suspended-status">Suspendido</option>
-                                        <option value="full-status">Cupo completo</option>
                                         <option value="inactive-status">Inactivo</option>
                                     </select>
                                 </div>
@@ -1449,18 +1316,23 @@
                                     </select>
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="form-label" for="need-form-status">Estado</label>
-                                    <select class="form-input" id="need-form-status" style="padding: 0 0.75rem;">
-                                        <option value="active-status">Activa</option>
-                                        <option value="inactive-status">Inactiva</option>
-                                    </select>
-                                </div>
-
                                 <div class="form-actions-row">
                                     <button class="eval-submit-btn" id="btn-save-need">Guardar necesidad</button>
                                     <button class="eval-secondary-btn" id="btn-cancel-need">Cancelar</button>
                                 </div>
+                            </div>
+                            
+                            <div class="suggest-form-card" id="need-form-success-container" style="display: none; text-align:center; padding: 2rem 0; flex-direction:column; align-items:center; gap:1.5rem; animation: fadeIn 0.4s ease;">
+                                <div style="width:72px; height:72px; background-color:#e8f5e9; color:#2e7d56; border-radius:50%; display:flex; align-items:center; justify-content:center; margin: 0 auto;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:36px; height:36px;">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="form-section-title" style="font-size:1.6rem; color:#2e7d56; border:none; margin-bottom:0.5rem; padding:0;">¡Necesidad guardada!</h3>
+                                    <p style="font-size:1.1rem; color:var(--text-muted); line-height:1.5; max-width:500px; margin:0 auto;" id="need-success-message">Necesidad agregada correctamente.</p>
+                                </div>
+                                <button class="eval-submit-btn" id="btn-success-back-need" style="background-color: var(--brand-mustard); box-shadow: 0 6px 15px rgba(239, 154, 46, 0.2); margin-top: 1.5rem; max-width: 300px;">Volver</button>
                             </div>
                         </div>
                     </div>
@@ -1896,94 +1768,9 @@
                                         <h3>Favoritos</h3>
                                     </div>
                                     <div style="display:flex; flex-direction:column; gap:0.8rem; margin:0.25rem 0;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
-                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
-                                                Parroquia San José
-                                            </span>
-                                            <div style="display:flex; gap:0.5rem;">
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Duchas">
-                                                    <div class="service-card-icon-wrapper circle-duchas" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M7 4h5a6 6 0 0 1 6 6v1"></path><path d="M15 11h6v2h-6zM16 16v.01M18 16v.01M20 16v.01"></path></svg>
-                                                    </div>
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Ropa">
-                                                    <div class="service-card-icon-wrapper circle-clothing" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 17l10-10 10 10Z"></path><path d="M12 7a3 3 0 1 0-3-3"></path></svg>
-                                                    </div>
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
-                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
-                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
-                                                Comedor Esperanza
-                                            </span>
-                                            <div style="display:flex; gap:0.5rem;">
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
-                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
-                                                    </div>
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Ropa">
-                                                    <div class="service-card-icon-wrapper circle-clothing" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 17l10-10 10 10Z"></path><path d="M12 7a3 3 0 1 0-3-3"></path></svg>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
-                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
-                                                Centro Comunitario Norte
-                                            </span>
-                                            <div style="display:flex; gap:0.5rem;">
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Apoyo escolar">
-                                                    <div class="service-card-icon-wrapper circle-apoyo" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-                                                    </div>
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;" title="Comida">
-                                                    <div class="service-card-icon-wrapper circle-comida" style="width:36px; height:36px; margin:0; flex-shrink:0;">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3v3M8 3.5v2M16 3.5v2M3 11h18c0 4.5-3.5 8-9 8s-9-3.5-9-8z"></path></svg>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <p style="color:var(--text-muted); margin:0;">Accedé a tus organizaciones guardadas.</p>
                                     </div>
                                     <button class="my-org-card-btn eval-secondary-btn" id="btn-view-favorites">Ver favoritos</button>
-                                </div>
-
-                                <!-- 4. Mis sugerencias Card -->
-                                <div class="my-org-card">
-                                    <div class="my-org-card-title-row">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="my-org-card-icon">
-                                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                                        </svg>
-                                        <h3>Mis sugerencias</h3>
-                                    </div>
-                                    <div style="display:flex; flex-direction:column; gap:0.8rem; margin:0.25rem 0;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
-                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
-                                                Comedor Nuevo Horizonte
-                                            </span>
-                                            <span class="status-badge-custom pending" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Pendiente</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem; display:flex; align-items:center; gap:0.6rem;">
-                                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--brand-rust); border-radius:50%;"></span>
-                                                Centro Comunitario Santa Clara
-                                            </span>
-                                            <span class="status-badge-custom approved" style="font-size:0.75rem; padding:0.25rem 0.65rem;">Aprobada</span>
-                                        </div>
-                                    </div>
-                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-view-suggestions">Ver sugerencias</button>
                                 </div>
                             </div>
 
@@ -1997,35 +1784,8 @@
                                         </svg>
                                         <h3>Mis reseñas</h3>
                                     </div>
-                                    <div style="display:flex; flex-direction:column; gap:1rem; margin:0.25rem 0;">
-                                        <div style="border-bottom:1px solid #f5ede6; padding-bottom:0.8rem; display:flex; flex-direction:column; gap:0.4rem;">
-                                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                <span style="font-weight:700; color:var(--brand-charcoal); font-size:1.05rem;">Parroquia San José</span>
-                                                <span style="color:var(--brand-mustard); font-weight:700; font-size:1rem; display:flex; align-items:center; gap:0.25rem;">
-                                                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px; height:16px; color: var(--brand-mustard);">
-                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                                    </svg>
-                                                    5
-                                                </span>
-                                            </div>
-                                            <p style="font-size:0.95rem; color:var(--text-muted); font-style:italic; font-weight:500; margin:0;">
-                                                “Muy buen trato.”
-                                            </p>
-                                        </div>
-                                        <div style="padding-bottom:0.2rem; display:flex; flex-direction:column; gap:0.4rem;">
-                                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                <span style="font-weight:700; color:var(--brand-charcoal); font-size:1.05rem;">Comedor Esperanza</span>
-                                                <span style="color:var(--brand-mustard); font-weight:700; font-size:1rem; display:flex; align-items:center; gap:0.25rem;">
-                                                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px; height:16px; color: var(--brand-mustard);">
-                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                                    </svg>
-                                                    4
-                                                </span>
-                                            </div>
-                                            <p style="font-size:0.95rem; color:var(--text-muted); font-style:italic; font-weight:500; margin:0;">
-                                                “Comida abundante.”
-                                            </p>
-                                        </div>
+                                    <div style="display:flex; flex-direction:column; gap:0.8rem; margin:0.25rem 0;">
+                                        <p style="color:var(--text-muted); margin:0;">Consultá las reseñas que realizaste.</p>
                                     </div>
                                     <button class="my-org-card-btn eval-secondary-btn" id="btn-view-reviews">Ver reseñas</button>
                                 </div>
@@ -2069,27 +1829,15 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="edit-profile-email">Email</label>
-                                    <input type="email" class="form-input" id="edit-profile-email" value="juan@example.com">
+                                    <input type="email" class="form-input" id="edit-profile-email" value="juan@example.com" disabled style="background-color: rgba(0,0,0,0.02); cursor: not-allowed; opacity: 0.7;">
+                                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem; margin-bottom: 0;">El email de acceso no puede modificarse desde esta pantalla.</p>
                                 </div>
                             </div>
 
                             <!-- 3. Seguridad -->
                             <div style="border-top: 1px solid #f5ede6; padding-top: 1.5rem; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
                                 <h3 class="form-section-title" style="font-size: 1.2rem; font-weight: 700; color: var(--brand-charcoal); border: none; margin: 0; padding: 0;">Cambiar contraseña</h3>
-                                <div class="form-group">
-                                    <label class="form-label" for="edit-profile-curr-pass">Contraseña actual</label>
-                                    <input type="password" class="form-input" id="edit-profile-curr-pass" placeholder="Ingresá tu contraseña actual">
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label" for="edit-profile-new-pass">Nueva contraseña</label>
-                                        <input type="password" class="form-input" id="edit-profile-new-pass" placeholder="Nueva contraseña">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label" for="edit-profile-conf-pass">Confirmar nueva contraseña</label>
-                                        <input type="password" class="form-input" id="edit-profile-conf-pass" placeholder="Confirmar contraseña">
-                                    </div>
-                                </div>
+                                <p style="color:var(--text-muted); margin:0;">El cambio de contraseña estará disponible en una próxima versión.</p>
                             </div>
 
                             <!-- 4. Actions -->
@@ -2198,7 +1946,7 @@
                                     <span class="eval-tag-pill" data-tag="Atención rápida">Atención rápida</span>
                                     <span class="eval-tag-pill" data-tag="Fácil acceso">Fácil acceso</span>
                                     <span class="eval-tag-pill" data-tag="Personal amable">Personal amable</span>
-                                    <span class="eval-tag-pill" data-tag="Mucha disponibilidad de recursos">Mucha disponibilidad de recursos</span>
+                                    <span class="eval-tag-pill" data-tag="Buena disponibilidad de recursos">Buena disponibilidad de recursos</span>
                                 </div>
                                 <div style="margin-bottom: 0.5rem;">
                                     <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--brand-rust);">&#8593; Para mejorar</span>
@@ -2261,7 +2009,7 @@
     <!-- Leaflet Map JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <!-- JavaScript logic -->
-    <script src="app.js"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>
 
