@@ -1271,21 +1271,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Construir la URL pública que apunta a Streamlit (app.py)
                     let baseUrl = "";
                     try {
-                        // Intento 1: Acceder al parent (funciona en local)
+                        // Intento 1: Acceder al parent (funciona en local sin errores CORS)
                         if (window.parent && window.parent.location && window.parent.location.origin && window.parent.location.origin !== "null") {
                             baseUrl = window.parent.location.origin + window.parent.location.pathname;
                         } else {
                             throw new Error("Parent location restricted");
                         }
                     } catch(err) {
-                        // Intento 2: Usar document.referrer (funciona en deploy/Streamlit Cloud)
-                        if (document.referrer) {
-                            const refUrl = new URL(document.referrer);
-                            baseUrl = refUrl.origin + refUrl.pathname;
-                        } else {
-                            // Fallback absoluto si nada más funciona
-                            baseUrl = "https://app.comunitas.com/";
-                        }
+                        // Intento 2: Fallback directo a la URL de Producción
+                        // Esto se ejecuta en Streamlit Cloud donde window.parent está bloqueado
+                        baseUrl = "https://comunitas.streamlit.app/";
                     }
                     
                     // Limpiar trailing slashes por las dudas
