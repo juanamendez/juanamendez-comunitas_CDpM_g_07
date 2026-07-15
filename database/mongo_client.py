@@ -14,6 +14,15 @@ def get_user_by_email(email):
     collection = get_users_collection()
     return collection.find_one({"email": email})
 
+def create_user(email, password, supabase_user_id):
+    hash_val = hash_password(password)
+    collection = get_users_collection()
+    collection.insert_one({
+        "email": email,
+        "password_hash": hash_val,
+        "supabase_user_id": supabase_user_id
+    })
+
 def hash_password(plain_password: str) -> str:
     return bcrypt.hashpw(plain_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 

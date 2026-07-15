@@ -365,6 +365,18 @@
                         <!-- 1. Left Filter Panel -->
                         <aside class="map-filter-panel">
                             <h2 class="filter-panel-title">Filtros</h2>
+                            <div class="filter-group">
+                                <div style="margin-bottom: 1.5rem; text-align: center;" title="Tu ubicación se usa solo para centrar el mapa y no se guarda.">
+                                    <button id="btn-center-location" class="eval-submit-btn" style="background-color: var(--brand-mustard); color: white; padding: 0.6rem; border-radius: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.95rem; border: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        Centrar en mi ubicación
+                                    </button>
+                                    <div id="location-error-msg" style="color: var(--brand-coral); font-size: 0.85rem; margin-top: 0.5rem; display: none;"></div>
+                                </div>
+                            </div>
                             
                             <div class="filter-group">
                                 <h3 class="filter-group-title">Servicio</h3>
@@ -1030,16 +1042,8 @@
                                         <h3>Miembros</h3>
                                     </div>
                                     <div class="my-org-members-list" id="my-org-members-list" style="display:flex; flex-direction:column; gap:0.75rem; margin:0.5rem 0;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5ede6; padding-bottom:0.6rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">María García</span>
-                                            <span style="font-size:0.8rem; font-weight:700; color:var(--brand-rust); background-color:#fcefe9; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Administradora</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.25rem;">
-                                            <span style="font-weight:600; color:var(--brand-charcoal); font-size:1.05rem;">Juan Pérez</span>
-                                            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); background-color:#f5ede6; padding:0.25rem 0.65rem; border-radius:20px; text-transform: uppercase; letter-spacing: 0.5px;">Editor</span>
-                                        </div>
+                                        <p style="color: var(--text-muted); font-size: 0.95rem; font-style: italic;">Podés ver los miembros de tu organización en el panel superior.</p>
                                     </div>
-                                    <button class="my-org-card-btn eval-secondary-btn" id="btn-manage-my-org-members" style="margin-top: 1rem;">Administrar miembros</button>
                                 </div>
 
                             </div>

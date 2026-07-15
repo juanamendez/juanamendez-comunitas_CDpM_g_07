@@ -18,6 +18,105 @@ def get_logo_base64():
 
 logo_data_uri = get_logo_base64()
 
+# --- Ficha Pública Web Interception ---
+share_org_id = st.query_params.get("share_org")
+if share_org_id:
+    st.markdown("""
+        <style>
+            #MainMenu {visibility: hidden;}
+            header {visibility: hidden;}
+            footer {visibility: hidden;}
+            .stApp { background-color: #fbf9f6; }
+            .block-container { padding-top: 0 !important; padding-bottom: 0 !important; max-width: 100% !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    url = st.secrets.get("SUPABASE_URL", "")
+    key = st.secrets.get("SUPABASE_KEY", "")
+    
+    if url and key:
+        try:
+            supabase = create_client(url, key)
+            
+            # Fetch Org Data
+            org_res = supabase.table("view_organizations_public").select("*").eq("org_id", int(share_org_id)).execute()
+            
+            if org_res.data and len(org_res.data) > 0:
+                org_data = org_res.data[0]
+                name = org_data.get("name", "Organización")
+                address = org_data.get("address", "Dirección no disponible")
+                phone = org_data.get("phone", "")
+                lat = org_data.get("latitude")
+                lng = org_data.get("longitude")
+                
+                # Fetch Services
+                srv_res = supabase.table("view_services_full").select("*").eq("org_id", int(share_org_id)).execute()
+                
+                services_names = []
+                scheds_html = ""
+                
+                if srv_res.data:
+                    active_srvs = [s for s in srv_res.data if s.get("service_status") in ["active", "full"] or s.get("status") in ["active", "full"]]
+                    for s in active_srvs:
+                        s_name = s.get("service_type") or s.get("type_name") or s.get("title") or "Servicio"
+                        services_names.append(s_name)
+                        sched = s.get("schedule")
+                        if sched:
+                            scheds_html += f'<div class="sched-item"><strong>{s_name}:</strong> {sched}</div>'
+                
+                services_list = ", ".join(services_names) if services_names else "Sin servicios informados"
+                if not scheds_html:
+                    scheds_html = '<div style="color:#827B75;">Horario no informado</div>'
+                
+                phone_html = ""
+                if phone:
+                    phone_html = f'''
+                    <div class="info-row">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+                        <div style="font-size:16px;">{phone}</div>
+                    </div>
+                    '''
+                
+                map_html = ""
+                maps_btn = ""
+                has_coords = "false"
+                if lat and lng:
+                    has_coords = "true"
+                    map_html = '<div id="map"></div>'
+                    maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+                    maps_btn = f'''
+                    <a href="{maps_url}" target="_blank" class="btn">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:-4px;"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                        Cómo llegar
+                    </a>
+                    '''
+                
+                from public_card_template import PUBLIC_CARD_HTML
+                
+                final_html = PUBLIC_CARD_HTML.format(
+                    name=name,
+                    address=address,
+                    phone_html=phone_html,
+                    services_list=services_list,
+                    schedules_html=scheds_html,
+                    map_html=map_html,
+                    maps_btn=maps_btn,
+                    has_coords=has_coords,
+                    lat=lat or 0,
+                    lng=lng or 0
+                )
+                
+                components.html(final_html, height=800, scrolling=True)
+            else:
+                st.warning("Organización no encontrada.")
+        except Exception as e:
+            st.error(f"Error cargando ficha: {e}")
+    else:
+        st.error("Error de configuración.")
+        
+    st.stop()
+# ----------------------------------------
+
 if not st.session_state.get("current_user"):
     st.markdown("""
         <style>
@@ -105,37 +204,106 @@ if not st.session_state.get("current_user"):
             <p class="welcome-subtitle">Conectamos personas con recursos comunitarios cercanos.</p>
         """, unsafe_allow_html=True)
         
-        email = st.text_input("Email")
-        password = st.text_input("Contraseña", type="password")
-        
-        if st.button("Iniciar sesión", type="primary", use_container_width=True):
-            from database.mongo_client import authenticate_user
-            auth_data = authenticate_user(email, password)
-            if auth_data:
-                url = st.secrets.get("SUPABASE_URL", "")
-                key = st.secrets.get("SUPABASE_KEY", "")
-                if url and key:
-                    supabase = create_client(url, key)
-                    res_current_user = supabase.table("view_users_public").select(
-                        "user_id, full_name, email, role, created_at"
-                    ).eq("user_id", auth_data["supabase_user_id"]).single().execute()
-                    if res_current_user and hasattr(res_current_user, "data") and res_current_user.data:
-                        st.session_state["current_user"] = {
-                            "user_id": res_current_user.data["user_id"],
-                            "full_name": res_current_user.data["full_name"],
-                            "email": res_current_user.data["email"],
-                            "role": res_current_user.data["role"],
-                            "created_at": res_current_user.data["created_at"],
-                            "supabase_user_id": res_current_user.data["user_id"]
-                        }
-                        st.rerun()
-            else:
-                st.error("Email o contraseña incorrectos.")
+        if not st.session_state.get('show_register', False):
+            email = st.text_input("Email")
+            password = st.text_input("Contraseña", type="password")
+            
+            if st.button("Iniciar sesión", type="primary", use_container_width=True):
+                from database.mongo_client import authenticate_user
+                auth_data = authenticate_user(email, password)
+                if auth_data:
+                    url = st.secrets.get("SUPABASE_URL", "")
+                    key = st.secrets.get("SUPABASE_KEY", "")
+                    if url and key:
+                        supabase = create_client(url, key)
+                        res_current_user = supabase.table("view_users_public").select(
+                            "user_id, full_name, email, role, created_at"
+                        ).eq("user_id", auth_data["supabase_user_id"]).single().execute()
+                        if res_current_user and hasattr(res_current_user, "data") and res_current_user.data:
+                            st.session_state["current_user"] = {
+                                "user_id": res_current_user.data["user_id"],
+                                "full_name": res_current_user.data["full_name"],
+                                "email": res_current_user.data["email"],
+                                "role": res_current_user.data["role"],
+                                "created_at": res_current_user.data["created_at"],
+                                "supabase_user_id": res_current_user.data["user_id"]
+                            }
+                            st.rerun()
+                else:
+                    st.error("Email o contraseña incorrectos.")
+                    
+            st.markdown('<div class="divider"><span>¿No tenés cuenta?</span></div>', unsafe_allow_html=True)
+            
+            if st.button("Registrarse", type="secondary", use_container_width=True):
+                st.session_state['show_register'] = True
+                st.rerun()
+        else:
+            st.markdown("<h3 style='text-align: center; color: #4C433D; margin-bottom: 1rem;'>Crear cuenta</h3>", unsafe_allow_html=True)
+            reg_name = st.text_input("Nombre completo")
+            reg_email = st.text_input("Email")
+            reg_password = st.text_input("Contraseña", type="password")
+            reg_confirm = st.text_input("Confirmar contraseña", type="password")
+            
+            if st.button("Crear cuenta", type="primary", use_container_width=True):
+                import re
+                reg_name = reg_name.strip()
+                reg_email = reg_email.strip().lower()
                 
-        st.markdown('<div class="divider"><span>¿No tenés cuenta?</span></div>', unsafe_allow_html=True)
-        
-        if st.button("Registrarse", type="secondary", use_container_width=True):
-            st.info("El registro estará disponible próximamente.\\n\\nPróximamente vas a poder crear una cuenta e indicar si sos beneficiario, colaborador o miembro de una organización.")
+                if not reg_name:
+                    st.error("El nombre completo no puede estar vacío.")
+                elif not reg_email:
+                    st.error("El email no puede estar vacío.")
+                elif not re.match(r"[^@]+@[^@]+\.[^@]+", reg_email):
+                    st.error("El formato del email es inválido.")
+                elif not reg_password:
+                    st.error("La contraseña no puede estar vacía.")
+                elif len(reg_password) < 6:
+                    st.error("La contraseña debe tener al menos 6 caracteres.")
+                elif reg_password != reg_confirm:
+                    st.error("Las contraseñas no coinciden.")
+                else:
+                    from database.mongo_client import get_user_by_email, create_user
+                    
+                    url = st.secrets.get("SUPABASE_URL", "")
+                    service_key = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", "")
+                    
+                    if not url or not service_key:
+                        st.error("Error de configuración de Supabase.")
+                    else:
+                        supabase_admin = create_client(url, service_key)
+                        
+                        res_supa = supabase_admin.table("users").select("user_id").eq("email", reg_email).execute()
+                        if res_supa and hasattr(res_supa, "data") and len(res_supa.data) > 0:
+                            st.error("Este email ya está registrado.")
+                        else:
+                            if get_user_by_email(reg_email):
+                                st.error("Este email ya está registrado.")
+                            else:
+                                try:
+                                    res_insert = supabase_admin.table("users").insert({
+                                        "full_name": reg_name,
+                                        "email": reg_email,
+                                        "role": "beneficiary",
+                                        "password_hash": "mongo_auth_only"
+                                    }).execute()
+                                    
+                                    new_user_id = res_insert.data[0]["user_id"]
+                                    
+                                    try:
+                                        create_user(reg_email, reg_password, new_user_id)
+                                        st.success("Cuenta creada correctamente. Ahora podés iniciar sesión.")
+                                        st.session_state['show_register'] = False
+                                    except Exception:
+                                        supabase_admin.table("users").delete().eq("user_id", new_user_id).execute()
+                                        st.error("Ocurrió un error al guardar credenciales. Por favor intentá de nuevo.")
+                                except Exception:
+                                    st.error("Ocurrió un error al crear la cuenta. Por favor intentá de nuevo.")
+            
+            st.markdown('<div class="divider"><span>O</span></div>', unsafe_allow_html=True)
+            if st.button("Ya tengo cuenta", type="secondary", use_container_width=True):
+                st.session_state['show_register'] = False
+                st.rerun()
+
     st.stop()
 
 # Setup Supabase connection
@@ -331,4 +499,100 @@ if current_user:
             st.session_state["logout_signal"] = True
             st.rerun()
 
-components.html(html_content, height=1000, scrolling=True)
+    # Logica de Organización
+    url = st.secrets.get("SUPABASE_URL", "")
+    service_key = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    
+    if url and service_key:
+        supabase_admin = create_client(url, service_key)
+        current_uid = current_user.get("supabase_user_id")
+        
+        # Consultar organization_members
+        res_mem = supabase_admin.table("organization_members").select("*").eq("user_id", current_uid).execute()
+        
+        if res_mem and hasattr(res_mem, "data"):
+            active_memberships = [m for m in res_mem.data if m.get("is_active")]
+            has_any_membership = len(res_mem.data) > 0
+            
+            # Bloqueo o visualización
+            if not has_any_membership:
+                st.warning("No estás vinculado a ninguna organización.\\nSi pertenecés a una, comunicate con el equipo administrador de COMUNITAS para solicitar acceso.")
+            elif len(active_memberships) == 0:
+                st.warning("Tu acceso a esta organización no está activo.\\nSi creés que es un error, comunicate con el equipo administrador de COMUNITAS.")
+            else:
+                # El usuario tiene membresía activa. Tomamos la primera.
+                my_org_id = active_memberships[0]["org_id"]
+                
+                with st.expander("🛠️ Panel de Administración de Miembros (Mi Organización)", expanded=False):
+                    st.markdown("### Miembros Actuales")
+                    org_members_res = supabase_admin.table("organization_members").select("*, users(full_name, email)").eq("org_id", my_org_id).execute()
+                    
+                    if org_members_res and hasattr(org_members_res, "data"):
+                        active_count = sum(1 for m in org_members_res.data if m.get("is_active"))
+                        
+                        for member in org_members_res.data:
+                            u_data = member.get("users") or {}
+                            name = u_data.get("full_name", "Desconocido")
+                            email = u_data.get("email", "")
+                            status = "Activo" if member.get("is_active") else "Inactivo"
+                            
+                            mc1, mc2, mc3 = st.columns([3, 1, 2])
+                            mc1.write(f"**{name}** ({email})")
+                            mc2.write(status)
+                            
+                            if member.get("is_active"):
+                                if mc3.button("Quitar acceso", key=f"rem_{member['user_id']}"):
+                                    if member['user_id'] == current_uid:
+                                        st.error("No podés quitarte el acceso a vos mismo.")
+                                    elif active_count <= 1:
+                                        st.error("No podés dejar la organización sin miembros activos.")
+                                    else:
+                                        supabase_admin.table("organization_members").update({"is_active": False}).eq("user_id", member['user_id']).eq("org_id", my_org_id).execute()
+                                        st.success("Acceso removido correctamente.")
+                                        st.rerun()
+                                        
+                    st.markdown("---")
+                    st.markdown("### Agregar / Reactivar Miembro")
+                    
+                    with st.form("add_member_form"):
+                        new_member_email = st.text_input("Email del usuario registrado")
+                        submit_add = st.form_submit_button("Agregar Miembro", type="primary")
+                        
+                        if submit_add:
+                            import re
+                            email_norm = new_member_email.strip().lower()
+                            
+                            if not email_norm or not re.match(r"[^@]+@[^@]+\.[^@]+", email_norm):
+                                st.error("Formato de email inválido.")
+                            else:
+                                target_res = supabase_admin.table("users").select("user_id").eq("email", email_norm).execute()
+                                if not target_res or not target_res.data:
+                                    st.error("No encontramos un usuario registrado con ese email. Primero debe crear una cuenta en COMUNITAS.")
+                                else:
+                                    target_uid = target_res.data[0]["user_id"]
+                                    target_mems = supabase_admin.table("organization_members").select("*").eq("user_id", target_uid).execute()
+                                    
+                                    if target_mems and hasattr(target_mems, "data"):
+                                        target_active_in_same = any(m for m in target_mems.data if m.get("org_id") == my_org_id and m.get("is_active"))
+                                        target_inactive_in_same = next((m for m in target_mems.data if m.get("org_id") == my_org_id and not m.get("is_active")), None)
+                                        target_active_in_other = any(m for m in target_mems.data if m.get("org_id") != my_org_id and m.get("is_active"))
+                                        
+                                        if target_active_in_same:
+                                            st.error("El usuario ya es miembro activo de esta organización.")
+                                        elif target_active_in_other:
+                                            st.error("El usuario ya es miembro activo de otra organización.")
+                                        elif target_inactive_in_same:
+                                            supabase_admin.table("organization_members").update({"is_active": True}).eq("user_id", target_uid).eq("org_id", my_org_id).execute()
+                                            st.success("Miembro reactivado correctamente.")
+                                            st.rerun()
+                                        else:
+                                            supabase_admin.table("organization_members").insert({
+                                                "user_id": target_uid,
+                                                "org_id": my_org_id,
+                                                "member_role": "voluntario",
+                                                "is_active": True
+                                            }).execute()
+                                            st.success("Miembro agregado correctamente.")
+                                            st.rerun()
+
+        components.html(html_content, height=1000, scrolling=True)

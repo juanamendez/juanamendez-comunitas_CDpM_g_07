@@ -1152,7 +1152,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="status-badge ${orgData.status === 'active' ? 'open' : 'closed'}">• ${orgData.status === 'active' ? 'Activo' : 'Inactivo'}</span>
                             </div>
                         </div>
-                        <button class="eval-secondary-btn" id="btn-toggle-favorite" style="width: auto; padding: 0.5rem 1.25rem; height: 42px; margin: 0; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; ${favBtnStyle}">${favBtnText}</button>
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <button class="eval-secondary-btn" id="btn-toggle-favorite" style="width: auto; padding: 0.5rem 1.25rem; height: 42px; margin: 0; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; ${favBtnStyle}">${favBtnText}</button>
+                            <button class="eval-secondary-btn" id="btn-share-qr" style="width: auto; padding: 0.5rem; height: 42px; margin: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; border-color: var(--brand-mustard); color: var(--brand-mustard);" title="Compartir por QR">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6zM14 10h6M10 14v6M10 10h4v4h-4z"></path></svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="detail-desc-text">${orgData.description || ''}</p>
                 </div>
@@ -1253,6 +1258,81 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const favBtn = document.getElementById('btn-toggle-favorite');
+        
+        // --- Lógica Segura: Generación de QR (URL Pública) ---
+        const btnShareQr = document.getElementById('btn-share-qr');
+        if (btnShareQr) {
+            btnShareQr.addEventListener('click', () => {
+                try {
+                    // Remover modal existente si hubiera quedado pegado
+                    const oldModal = document.getElementById('qr-modal-overlay');
+                    if (oldModal) oldModal.remove();
+
+                    // Construir la URL pública que apunta a Streamlit (app.py)
+                    let baseUrl = "";
+                    try {
+                        // Intento 1: Acceder al parent (funciona en local)
+                        if (window.parent && window.parent.location && window.parent.location.origin && window.parent.location.origin !== "null") {
+                            baseUrl = window.parent.location.origin + window.parent.location.pathname;
+                        } else {
+                            throw new Error("Parent location restricted");
+                        }
+                    } catch(err) {
+                        // Intento 2: Usar document.referrer (funciona en deploy/Streamlit Cloud)
+                        if (document.referrer) {
+                            const refUrl = new URL(document.referrer);
+                            baseUrl = refUrl.origin + refUrl.pathname;
+                        } else {
+                            // Fallback absoluto si nada más funciona
+                            baseUrl = "https://app.comunitas.com/";
+                        }
+                    }
+                    
+                    // Limpiar trailing slashes por las dudas
+                    if (baseUrl.endsWith('/')) {
+                        baseUrl = baseUrl.slice(0, -1);
+                    }
+                    
+                    const publicUrl = `${baseUrl}?share_org=${orgData.org_id}`;
+                    
+                    const encodedUrl = encodeURIComponent(publicUrl);
+                    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedUrl}`;
+
+                    // Mostrar modal
+                    const modalHtml = `
+                        <div id="qr-modal-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center;">
+                            <div style="background:#fff; border-radius:12px; padding:1.5rem; text-align:center; max-width:90%; width:320px; box-shadow:0 4px 12px rgba(0,0,0,0.2); position:relative;">
+                                <button id="btn-close-qr" style="position:absolute; top:10px; right:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+                                <h3 style="color:var(--brand-terracotta); margin-bottom:1rem; font-size:1.2rem;">Ficha Pública</h3>
+                                <div style="min-height:250px; display:flex; align-items:center; justify-content:center; margin-bottom:1rem; background:#f9f9f9; border-radius:8px;">
+                                    <img src="${qrImgUrl}" alt="Código QR" style="max-width:100%; display:block;" onerror="this.onerror=null; this.parentNode.innerHTML='<p style=\\'color:var(--brand-coral);\\'>No se pudo cargar el QR. Verifique su conexión.</p>';">
+                                </div>
+                                <p style="font-size:0.9rem; color:var(--text-main); margin-bottom:0;">Mostrale este QR a cualquier persona para compartir toda la información y la ubicación de esta organización.</p>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                    // Eventos de cierre
+                    document.getElementById('btn-close-qr').addEventListener('click', () => {
+                        const m = document.getElementById('qr-modal-overlay');
+                        if (m) m.remove();
+                    });
+                    document.getElementById('qr-modal-overlay').addEventListener('click', (e) => {
+                        if (e.target.id === 'qr-modal-overlay') {
+                            e.target.remove();
+                        }
+                    });
+
+                } catch(e) {
+                    console.error("Error al generar QR:", e);
+                    alert("Ocurrió un error al intentar generar el código QR. " + e.message);
+                }
+            });
+        }
+        // -----------------------------------------------------
+
         if (favBtn) {
             favBtn.addEventListener('click', async () => {
                 const creds = window.INJECTED_DATA.credentials;
@@ -4419,15 +4499,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Bind persistent buttons only once
         if (!manageMembersEventsBound) {
-            // 1. "Administrar miembros" dashboard button switches to screen 5.6
-            const btnManageMembers = document.getElementById('btn-manage-my-org-members');
-            if (btnManageMembers) {
-                btnManageMembers.addEventListener('click', () => {
-                    console.warn("ALERT PROXIMA ETAPA disparado desde:", "btn-manage-my-org-members");
-                    alert('Esta función se conectará en la próxima etapa.');
-                });
-            }
-
             // 2. Back arrow in header & footer Volver button on list view
             const btnBackHeader = document.getElementById('btn-back-to-my-org-from-members-header');
             if (btnBackHeader) {
@@ -5613,4 +5684,85 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('mousedown', () => {
         document.body.classList.remove('user-is-tabbing');
     });
+
+    // --- Center on My Location Logic ---
+    const btnCenterLocation = document.getElementById('btn-center-location');
+    if (btnCenterLocation) {
+        btnCenterLocation.addEventListener('click', () => {
+            const errorMsg = document.getElementById('location-error-msg');
+            if (errorMsg) errorMsg.style.display = 'none';
+
+            if (!navigator.geolocation) {
+                if (errorMsg) {
+                    errorMsg.textContent = "La geolocalización no está disponible en este dispositivo o navegador.";
+                    errorMsg.style.display = 'block';
+                }
+                return;
+            }
+
+            const originalContent = btnCenterLocation.innerHTML;
+            btnCenterLocation.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg> Buscando...`;
+            btnCenterLocation.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    btnCenterLocation.innerHTML = originalContent;
+                    btnCenterLocation.disabled = false;
+                    
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    if (typeof mapUserLocation !== 'undefined') {
+                        mapUserLocation = { lat, lng };
+                    }
+
+                    if (typeof map !== 'undefined' && !map) {
+                        if (typeof initLeafletMap === 'function') initLeafletMap();
+                    }
+
+                    if (typeof window.userLocationMarker !== 'undefined' && window.userLocationMarker) {
+                        window.userLocationMarker.setLatLng([lat, lng]);
+                        if (!window.userLocationMarker.getPopup()) {
+                            window.userLocationMarker.bindPopup("<b>Tu ubicación</b><br>Solo visible para vos.");
+                        }
+                    } else if (typeof map !== 'undefined' && map) {
+                        const userIcon = L.divIcon({
+                            className: 'user-location-marker',
+                            html: '<div style="width: 16px; height: 16px; background-color: #2196F3; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
+                            iconSize: [22, 22],
+                            iconAnchor: [11, 11]
+                        });
+                        window.userLocationMarker = L.marker([lat, lng], {
+                            icon: userIcon,
+                            zIndexOffset: 1000,
+                            interactive: true
+                        }).addTo(map).bindPopup("<b>Tu ubicación</b><br>Solo visible para vos.");
+                    }
+
+                    if (typeof map !== 'undefined' && map) {
+                        map.setView([lat, lng], 15);
+                    }
+                },
+                (error) => {
+                    btnCenterLocation.innerHTML = originalContent;
+                    btnCenterLocation.disabled = false;
+                    
+                    if (errorMsg) {
+                        if (error.code === error.PERMISSION_DENIED) {
+                            errorMsg.textContent = "No pudimos acceder a tu ubicación. Podés habilitar el permiso desde la configuración del navegador.";
+                        } else {
+                            errorMsg.textContent = "Hubo un error al intentar obtener tu ubicación.";
+                        }
+                        errorMsg.style.display = 'block';
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        });
+    }
+
 });
