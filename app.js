@@ -1274,12 +1274,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Intento 1: Acceder al parent (funciona en local sin errores CORS)
                         if (window.parent && window.parent.location && window.parent.location.origin && window.parent.location.origin !== "null") {
                             baseUrl = window.parent.location.origin + window.parent.location.pathname;
+                            
+                            // Si detectamos que Streamlit nos está dando su dominio interno, forzamos el error
+                            if (baseUrl.includes("share.streamlit.io") || baseUrl.includes("components.streamlit")) {
+                                throw new Error("Streamlit internal host detected");
+                            }
                         } else {
                             throw new Error("Parent location restricted");
                         }
                     } catch(err) {
                         // Intento 2: Fallback directo a la URL de Producción
-                        // Esto se ejecuta en Streamlit Cloud donde window.parent está bloqueado
+                        // Esto se ejecuta en Streamlit Cloud donde window.parent está bloqueado o nos da el host interno
                         baseUrl = "https://comunitas.streamlit.app/";
                     }
                     
