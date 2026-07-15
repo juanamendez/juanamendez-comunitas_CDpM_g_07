@@ -1268,33 +1268,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const oldModal = document.getElementById('qr-modal-overlay');
                     if (oldModal) oldModal.remove();
 
-                    // Construcción segura de datos
-                    const name = orgData.name || "Organización";
-                    const address = orgData.address || "Dirección no disponible";
-                    const phone = orgData.phone ? `\nTeléfono:\n${orgData.phone}\n` : "\n";
+                    // Construir URL pública (manteniendo localhost o la URL del deploy)
+                    const baseUrl = window.location.origin + window.location.pathname;
+                    const publicUrl = `${baseUrl}?ficha=${orgData.org_id}`;
                     
-                    const servicesList = (orgServicesData && orgServicesData.length > 0) 
-                        ? orgServicesData.map(s => s.service_type || s.service_name).filter(Boolean).join(', ')
-                        : "Sin servicios informados";
-                    
-                    let schedulesList = "Horario no informado";
-                    if (orgServicesData && orgServicesData.length > 0) {
-                        const scheds = [];
-                        orgServicesData.forEach(s => {
-                            if (s.schedule) scheds.push(`${s.service_type || s.type_name || s.title || 'Servicio'}: ${s.schedule}`);
-                        });
-                        if (scheds.length > 0) {
-                            schedulesList = scheds.join('\n');
-                        }
-                    }
-
-                    const lat = orgData.latitude || "";
-                    const lng = orgData.longitude || "";
-                    const mapsLink = (lat && lng) ? `\nCómo llegar:\nhttps://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` : "";
-
-                    // Construir texto
-                    const qrText = `COMUNITAS\n\n${name}\n\nDirección:\n${address}\n\nServicios:\n${servicesList}\n\nHorarios:\n${schedulesList}\n${phone}${mapsLink}`.trim();
-                    const encodedUrl = encodeURIComponent(qrText);
+                    const encodedUrl = encodeURIComponent(publicUrl);
                     const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedUrl}`;
 
                     // Mostrar modal

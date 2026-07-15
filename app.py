@@ -18,6 +18,171 @@ def get_logo_base64():
 
 logo_data_uri = get_logo_base64()
 
+# --- VISTA PÚBLICA (Ficha compartida por QR) ---
+ficha_id = st.query_params.get("ficha")
+if ficha_id:
+    url = st.secrets.get("SUPABASE_URL", "")
+    anon_key = st.secrets.get("SUPABASE_KEY", "")
+    if url and anon_key:
+        client = create_client(url, anon_key)
+        
+        # Consultar la organización
+        org_res = client.table("view_organizations_with_rating").select("*").eq("org_id", ficha_id).execute()
+        if not org_res or not org_res.data:
+            st.error("No encontramos esta organización.")
+            st.stop()
+            
+        org = org_res.data[0]
+        
+        # Consultar los servicios
+        serv_res = client.table("view_services_full").select("*").eq("org_id", ficha_id).execute()
+        services = serv_res.data if serv_res and hasattr(serv_res, "data") and serv_res.data else []
+        if not services and hasattr(serv_res, "data") == False: # fallback if structure is different
+            services = serv_res.data if serv_res else []
+            
+        # Filtrar solo activos
+        active_services = [s for s in services if s.get("service_status") in ("active", "full") or s.get("status") in ("active", "full")]
+        
+        # Armar el HTML
+        services_html = ""
+        for s in active_services:
+            name = s.get("service_type") or s.get("type_name") or s.get("title") or "Servicio"
+            sched = s.get("schedule") or "Horario no informado"
+            services_html += f"""
+            <div style="background: rgba(0,0,0,0.02); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                <div style="font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">{name}</div>
+                <div style="color: var(--text-muted); font-size: 0.85rem;">{sched}</div>
+            </div>
+            """
+            
+        if not services_html:
+            services_html = '<p style="color: var(--text-muted); font-size: 0.9rem; font-style: italic;">No hay servicios registrados.</p>'
+            
+        address = org.get("address") or "Dirección no disponible"
+        phone = org.get("phone")
+        phone_html = f'<p style="color: var(--text-main); font-size: 0.95rem; margin: 0 0 1rem 0;">📞 {phone}</p>' if phone else ''
+        
+        lat = org.get("latitude")
+        lng = org.get("longitude")
+        
+        map_script = ""
+        directions_btn = ""
+        if lat and lng:
+            directions_btn = f"""
+            <a href="https://www.google.com/maps/dir/?api=1&destination={lat},{lng}" target="_blank" style="display: block; width: 100%; text-align: center; background-color: var(--brand-mustard); color: white; padding: 1rem; border-radius: 12px; font-weight: 600; font-size: 1.05rem; text-decoration: none; margin-top: 1.5rem; box-shadow: 0 4px 12px rgba(230, 166, 32, 0.3);">
+                Cómo llegar
+            </a>
+            """
+            map_script = f"""
+            <div id="map" style="width: 100%; height: 200px; border-radius: 12px; margin-top: 1rem; z-index: 1;"></div>
+            <button id="btn-locate" style="width: 100%; margin-top: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; font-weight: 500; color: var(--text-main); cursor: pointer;">📍 Mostrar cómo llegar desde mi ubicación</button>
+            <p id="geo-error" style="color: var(--brand-terracotta); font-size: 0.8rem; margin-top: 0.25rem; display: none;"></p>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script>
+                var map = L.map('map', {{ zoomControl: false }}).setView([{lat}, {lng}], 15);
+                L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+                var customIcon = L.divIcon({{
+                    className: 'custom-div-icon',
+                    html: "<div style='background-color:#E6A620; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5);'></div>",
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                }});
+                var orgMarker = L.marker([{lat}, {lng}], {{icon: customIcon}}).addTo(map);
+                
+                var userMarker = null;
+                document.getElementById('btn-locate').addEventListener('click', function() {{
+                    var errEl = document.getElementById('geo-error');
+                    errEl.style.display = 'none';
+                    this.innerHTML = "Buscando...";
+                    this.disabled = true;
+                    
+                    if (!navigator.geolocation) {{
+                        errEl.textContent = "La geolocalización no está disponible.";
+                        errEl.style.display = 'block';
+                        this.innerHTML = "📍 Mostrar cómo llegar desde mi ubicación";
+                        this.disabled = false;
+                        return;
+                    }}
+                    
+                    navigator.geolocation.getCurrentPosition(function(pos) {{
+                        document.getElementById('btn-locate').innerHTML = "📍 Ubicación encontrada";
+                        var ulat = pos.coords.latitude;
+                        var ulng = pos.coords.longitude;
+                        
+                        if (userMarker) {{
+                            userMarker.setLatLng([ulat, ulng]);
+                        }} else {{
+                            var uIcon = L.divIcon({{
+                                className: 'user-icon',
+                                html: "<div style='background-color:#2196F3; width:12px; height:12px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5);'></div>",
+                                iconSize: [18, 18],
+                                iconAnchor: [9, 9]
+                            }});
+                            userMarker = L.marker([ulat, ulng], {{icon: uIcon}}).addTo(map).bindPopup("Tu ubicación");
+                        }}
+                        var bounds = L.latLngBounds([{lat}, {lng}], [ulat, ulng]);
+                        map.fitBounds(bounds, {{padding: [20, 20]}});
+                    }}, function(err) {{
+                        document.getElementById('btn-locate').innerHTML = "📍 Mostrar cómo llegar desde mi ubicación";
+                        document.getElementById('btn-locate').disabled = false;
+                        errEl.textContent = "No pudimos acceder a tu ubicación. Igualmente podés abrir la dirección en el mapa.";
+                        errEl.style.display = 'block';
+                    }}, {{ enableHighAccuracy: true, timeout: 10000 }});
+                }});
+            </script>
+            """
+            
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+            <style>
+                :root {{
+                    --bg-main: #FCFBF7;
+                    --bg-card: #FFFFFF;
+                    --brand-terracotta: #D36C4F;
+                    --brand-mustard: #E6A620;
+                    --brand-rose: #E5A3A0;
+                    --text-main: #4C433D;
+                    --text-muted: #7E7771;
+                    --border-color: #EFECE6;
+                }}
+                * {{ box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }}
+                body {{ background: var(--bg-main); margin: 0; padding: 1rem; display: flex; justify-content: center; min-height: 100vh; }}
+                .card {{ background: var(--bg-card); width: 100%; max-width: 450px; border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 30px rgba(76, 67, 61, 0.08); border: 1px solid var(--border-color); display: flex; flex-direction: column; }}
+                h1 {{ color: var(--brand-terracotta); font-size: 1.5rem; font-weight: 700; margin: 0 0 0.25rem 0; }}
+                .status {{ display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: rgba(76, 175, 80, 0.1); color: #2E7D32; margin-bottom: 1rem; }}
+                .address {{ color: var(--text-main); font-size: 0.95rem; font-weight: 500; margin: 0 0 0.5rem 0; line-height: 1.4; }}
+                h2 {{ color: var(--text-main); font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.75rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }}
+                .logo {{ width: 120px; margin-bottom: 1rem; object-fit: contain; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                {f'<img src="{logo_data_uri}" class="logo">' if logo_data_uri else ''}
+                <h1>{org.get('name', 'Organización')}</h1>
+                <span class="status">{"Activo" if org.get('status') == 'active' else "Inactivo"}</span>
+                
+                <p class="address">📍 {address}</p>
+                {phone_html}
+                
+                <h2>Servicios disponibles</h2>
+                {services_html}
+                
+                {map_script}
+                {directions_btn}
+            </div>
+        </body>
+        </html>
+        """
+        
+        components.html(html_content, height=850, scrolling=True)
+    
+    st.stop()
+# -----------------------------------------------
+
 if not st.session_state.get("current_user"):
     st.markdown("""
         <style>
