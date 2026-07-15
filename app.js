@@ -1259,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const favBtn = document.getElementById('btn-toggle-favorite');
         
-        // --- Lógica Segura: Generación de QR (URL Pública) ---
+        // --- Lógica Segura: Generación de QR (Versión 1) ---
         const btnShareQr = document.getElementById('btn-share-qr');
         if (btnShareQr) {
             btnShareQr.addEventListener('click', () => {
@@ -1268,11 +1268,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     const oldModal = document.getElementById('qr-modal-overlay');
                     if (oldModal) oldModal.remove();
 
-                    // Construir la URL pública que apunta a Streamlit (app.py)
-                    const baseUrl = window.location.origin + window.location.pathname;
-                    const publicUrl = `${baseUrl}?share_org=${orgData.org_id}`;
+                    // Construcción segura de datos
+                    const name = orgData.name || "Organización";
+                    const address = orgData.address || "Dirección no disponible";
+                    const phone = orgData.phone ? `\nTeléfono:\n${orgData.phone}\n` : "\n";
                     
-                    const encodedUrl = encodeURIComponent(publicUrl);
+                    const servicesList = (orgServicesData && orgServicesData.length > 0) 
+                        ? orgServicesData.map(s => s.service_type || s.service_name).filter(Boolean).join(', ')
+                        : "Sin servicios informados";
+                    
+                    let schedulesList = "Horario no informado";
+                    if (orgServicesData && orgServicesData.length > 0) {
+                        const scheds = [];
+                        orgServicesData.forEach(s => {
+                            if (s.schedule) scheds.push(`${s.service_type || s.type_name || s.title || 'Servicio'}: ${s.schedule}`);
+                        });
+                        if (scheds.length > 0) {
+                            schedulesList = scheds.join('\n');
+                        }
+                    }
+
+                    const lat = orgData.latitude || "";
+                    const lng = orgData.longitude || "";
+                    const mapsLink = (lat && lng) ? `\nCómo llegar:\nhttps://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` : "";
+
+                    // Construir texto
+                    const qrText = `COMUNITAS\n\n${name}\n\nDirección:\n${address}\n\nServicios:\n${servicesList}\n\nHorarios:\n${schedulesList}\n${phone}${mapsLink}`.trim();
+                    const encodedUrl = encodeURIComponent(qrText);
                     const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedUrl}`;
 
                     // Mostrar modal
@@ -1280,11 +1302,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div id="qr-modal-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center;">
                             <div style="background:#fff; border-radius:12px; padding:1.5rem; text-align:center; max-width:90%; width:320px; box-shadow:0 4px 12px rgba(0,0,0,0.2); position:relative;">
                                 <button id="btn-close-qr" style="position:absolute; top:10px; right:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
-                                <h3 style="color:var(--brand-terracotta); margin-bottom:1rem; font-size:1.2rem;">Ficha Pública</h3>
+                                <h3 style="color:var(--brand-terracotta); margin-bottom:1rem; font-size:1.2rem;">Compartir Organización</h3>
                                 <div style="min-height:250px; display:flex; align-items:center; justify-content:center; margin-bottom:1rem; background:#f9f9f9; border-radius:8px;">
                                     <img src="${qrImgUrl}" alt="Código QR" style="max-width:100%; display:block;" onerror="this.onerror=null; this.parentNode.innerHTML='<p style=\\'color:var(--brand-coral);\\'>No se pudo cargar el QR. Verifique su conexión.</p>';">
                                 </div>
-                                <p style="font-size:0.9rem; color:var(--text-main); margin-bottom:0;">Mostrale este QR a cualquier persona para compartir toda la información y la ubicación de esta organización.</p>
+                                <p style="font-size:0.9rem; color:var(--text-main); margin-bottom:0;">Escaneá este código para guardar la información y cómo llegar.</p>
                             </div>
                         </div>
                     `;
@@ -1304,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 } catch(e) {
                     console.error("Error al generar QR:", e);
-                    alert("Ocurrió un error al intentar generar el código QR. " + e.message);
+                    alert("Ocurrió un error al intentar generar el código QR.");
                 }
             });
         }
