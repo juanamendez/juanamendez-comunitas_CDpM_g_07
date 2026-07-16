@@ -1268,10 +1268,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     const oldModal = document.getElementById('qr-modal-overlay');
                     if (oldModal) oldModal.remove();
 
-                    // Construir URL pública (manteniendo localhost o la URL del deploy)
-                    const baseUrl = window.location.origin + window.location.pathname;
-                    const publicUrl = `${baseUrl}?ficha=${orgData.org_id}`;
+                    // Intentar obtener la URL real del padre usando document.referrer (funciona en iframes)
+                    let baseUrl = "https://comunitas.streamlit.app/";
+                    try {
+                        if (document.referrer) {
+                            const u = new URL(document.referrer);
+                            baseUrl = u.origin + u.pathname;
+                        }
+                    } catch(e) {
+                        console.warn("No se pudo leer document.referrer, usando fallback.");
+                    }
+                    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
                     
+                    const publicUrl = `${baseUrl}?ficha=${orgData.org_id}`;
                     const encodedUrl = encodeURIComponent(publicUrl);
                     const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedUrl}`;
 
