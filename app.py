@@ -737,8 +737,11 @@ if current_user:
             has_any_membership = len(res_mem.data) > 0
             
             # Bloqueo o visualización
+            admin_email = st.secrets.get("GMAIL_ADDRESS", "comunitas.admin@gmail.com")
+            
             if not has_any_membership:
-                st.warning("No estás vinculado a ninguna organización.\n\nSi pertenecés a una organización, comunicate con ellos para que te agreguen. Si tu organización es nueva y no tiene miembros, contactate con el equipo de COMUNITAS (comunitas.admin@gmail.com).")
+                if current_user.get("role") != "admin":
+                    st.warning(f"No estás vinculado a ninguna organización.\n\nSi pertenecés a una organización, comunicate con ellos para que te agreguen. Si tu organización es nueva y no tiene miembros, contactate con el equipo de COMUNITAS ({admin_email}).")
             elif len(active_memberships) == 0:
                 st.warning("Tu acceso a esta organización no está activo.\n\nSi creés que es un error, comunicate con el equipo administrador de COMUNITAS.")
             else:
