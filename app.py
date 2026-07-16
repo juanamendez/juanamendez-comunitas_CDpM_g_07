@@ -270,7 +270,119 @@ if not st.session_state.get("current_user"):
             <p class="welcome-subtitle">Conectamos personas con recursos comunitarios cercanos.</p>
         """, unsafe_allow_html=True)
         
-        if not st.session_state.get('show_register', False):
+        pending_email = st.session_state.get('pending_verification_email')
+        
+        if pending_email:
+            st.markdown("<h3 style='text-align: center; color: #4C433D; margin-bottom: 1rem;'>Verificar tu correo</h3>", unsafe_allow_html=True)
+            st.info(f"Enviamos un código de 6 dígitos a **{pending_email}**. (Por ahora revisá la consola del servidor para verlo).")
+            ver_code = st.text_input("Código de verificación", max_chars=6)
+            
+            if st.button("Verificar", type="primary", use_container_width=True):
+                from database.mongo_client import verify_user_email
+                if verify_user_email(pending_email, ver_code):
+                    st.session_state['verified_success_msg'] = True
+                    del st.session_state['pending_verification_email']
+                    st.rerun()
+                else:
+                    st.error("Código incorrecto.")
+            
+            st.markdown('<div class="divider"><span>O</span></div>', unsafe_allow_html=True)
+            if st.button("Volver al inicio", type="secondary", use_container_width=True):
+                del st.session_state['pending_verification_email']
+                st.rerun()
+                
+        elif st.session_state.get('show_forgot_password'):
+            st.markdown("<h3 style='text-align: center; color: #4C433D; margin-bottom: 1rem;'>Recuperar contraseña</h3>", unsafe_allow_html=True)
+            
+            # Etapa 1: Pedir Email
+            if not st.session_state.get('recovery_email_sent'):
+                st.info("Ingresá tu correo electrónico y te enviaremos un código para recuperar tu contraseña.")
+                rec_email = st.text_input("Email", key="rec_email")
+                
+                if st.button("Enviar código", type="primary", use_container_width=True):
+                    from database.mongo_client import generate_recovery_code
+                    code = generate_recovery_code(rec_email)
+                    if code:
+                        try:
+                            import smtplib
+                            from email.mime.text import MIMEText
+                            from email.mime.multipart import MIMEMultipart
+                            
+                            gmail_address = st.secrets.get("GMAIL_ADDRESS", "")
+                            gmail_password = st.secrets.get("GMAIL_APP_PASSWORD", "")
+                            
+                            msg = MIMEMultipart()
+                            msg['From'] = gmail_address
+                            msg['To'] = rec_email
+                            msg['Subject'] = "Código de recuperación de COMUNITAS"
+                            
+                            html_content = f"""
+                            <div style="font-family: sans-serif; text-align: center; padding: 2rem;">
+                                <h2 style="color: #D36C4F;">Recuperación de contraseña</h2>
+                                <p>Tu código de recuperación es:</p>
+                                <h1 style="background: #FCFBF7; border: 1px solid #EFECE6; padding: 1rem; border-radius: 8px; color: #4C433D; letter-spacing: 5px;">{code}</h1>
+                            </div>
+                            """
+                            msg.attach(MIMEText(html_content, 'html'))
+                            
+                            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                                server.starttls()
+                                server.login(gmail_address, gmail_password)
+                                server.send_message(msg)
+                                
+                            st.session_state['recovery_email_sent'] = rec_email
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al enviar el correo: {e}")
+                    else:
+                        st.error("No encontramos una cuenta con ese correo.")
+            
+            # Etapa 2: Validar Código
+            elif not st.session_state.get('recovery_code_verified'):
+                st.info(f"Enviamos un código a **{st.session_state['recovery_email_sent']}**.")
+                rec_code = st.text_input("Código de 6 dígitos", max_chars=6)
+                if st.button("Verificar código", type="primary", use_container_width=True):
+                    from database.mongo_client import verify_recovery_code
+                    if verify_recovery_code(st.session_state['recovery_email_sent'], rec_code):
+                        st.session_state['recovery_code_verified'] = True
+                        st.rerun()
+                    else:
+                        st.error("Código incorrecto o expirado.")
+            
+            # Etapa 3: Nueva Contraseña
+            else:
+                st.info("Ingresá tu nueva contraseña.")
+                new_pass = st.text_input("Nueva contraseña", type="password")
+                confirm_pass = st.text_input("Confirmar nueva contraseña", type="password")
+                
+                if st.button("Guardar contraseña", type="primary", use_container_width=True):
+                    if len(new_pass) < 6:
+                        st.error("La contraseña debe tener al menos 6 caracteres.")
+                    elif new_pass != confirm_pass:
+                        st.error("Las contraseñas no coinciden.")
+                    else:
+                        from database.mongo_client import update_password
+                        update_password(st.session_state['recovery_email_sent'], new_pass)
+                        st.success("¡Contraseña actualizada con éxito!")
+                        # Limpiar variables de estado
+                        del st.session_state['show_forgot_password']
+                        del st.session_state['recovery_email_sent']
+                        del st.session_state['recovery_code_verified']
+                        st.rerun()
+                        
+            st.markdown('<div class="divider"><span>O</span></div>', unsafe_allow_html=True)
+            if st.button("Volver al inicio", type="secondary", use_container_width=True):
+                del st.session_state['show_forgot_password']
+                if 'recovery_email_sent' in st.session_state: del st.session_state['recovery_email_sent']
+                if 'recovery_code_verified' in st.session_state: del st.session_state['recovery_code_verified']
+                st.rerun()
+
+        elif not st.session_state.get('show_register', False):
+            if st.session_state.get('verified_success_msg'):
+                st.success("¡Correo verificado con éxito! Ya podés iniciar sesión.")
+                # Lo borramos para que no aparezca siempre
+                del st.session_state['verified_success_msg']
+                
             email = st.text_input("Email")
             password = st.text_input("Contraseña", type="password")
             
@@ -278,25 +390,33 @@ if not st.session_state.get("current_user"):
                 from database.mongo_client import authenticate_user
                 auth_data = authenticate_user(email, password)
                 if auth_data:
-                    url = st.secrets.get("SUPABASE_URL", "")
-                    key = st.secrets.get("SUPABASE_KEY", "")
-                    if url and key:
-                        supabase = create_client(url, key)
-                        res_current_user = supabase.table("view_users_public").select(
-                            "user_id, full_name, email, role, created_at"
-                        ).eq("user_id", auth_data["supabase_user_id"]).single().execute()
-                        if res_current_user and hasattr(res_current_user, "data") and res_current_user.data:
-                            st.session_state["current_user"] = {
-                                "user_id": res_current_user.data["user_id"],
-                                "full_name": res_current_user.data["full_name"],
-                                "email": res_current_user.data["email"],
-                                "role": res_current_user.data["role"],
-                                "created_at": res_current_user.data["created_at"],
-                                "supabase_user_id": res_current_user.data["user_id"]
-                            }
-                            st.rerun()
+                    if auth_data.get("email_verified", True) == False:
+                        st.session_state['pending_verification_email'] = auth_data["email"]
+                        st.rerun()
+                    else:
+                        url = st.secrets.get("SUPABASE_URL", "")
+                        key = st.secrets.get("SUPABASE_KEY", "")
+                        if url and key:
+                            supabase = create_client(url, key)
+                            res_current_user = supabase.table("view_users_public").select(
+                                "user_id, full_name, email, role, created_at"
+                            ).eq("user_id", auth_data["supabase_user_id"]).single().execute()
+                            if res_current_user and hasattr(res_current_user, "data") and res_current_user.data:
+                                st.session_state["current_user"] = {
+                                    "user_id": res_current_user.data["user_id"],
+                                    "full_name": res_current_user.data["full_name"],
+                                    "email": res_current_user.data["email"],
+                                    "role": res_current_user.data["role"],
+                                    "created_at": res_current_user.data["created_at"],
+                                    "supabase_user_id": res_current_user.data["user_id"]
+                                }
+                                st.rerun()
                 else:
                     st.error("Email o contraseña incorrectos.")
+                    
+            if st.button("¿Olvidaste tu contraseña?", type="tertiary" if hasattr(st, "tertiary") else "secondary", use_container_width=True):
+                st.session_state['show_forgot_password'] = True
+                st.rerun()
                     
             st.markdown('<div class="divider"><span>¿No tenés cuenta?</span></div>', unsafe_allow_html=True)
             
@@ -356,12 +476,48 @@ if not st.session_state.get("current_user"):
                                     new_user_id = res_insert.data[0]["user_id"]
                                     
                                     try:
-                                        create_user(reg_email, reg_password, new_user_id)
-                                        st.success("Cuenta creada correctamente. Ahora podés iniciar sesión.")
+                                        import random
+                                        import smtplib
+                                        from email.mime.text import MIMEText
+                                        from email.mime.multipart import MIMEMultipart
+                                        
+                                        verification_code = str(random.randint(100000, 999999))
+                                        
+                                        gmail_address = st.secrets.get("GMAIL_ADDRESS", "")
+                                        gmail_password = st.secrets.get("GMAIL_APP_PASSWORD", "")
+                                        
+                                        if not gmail_address or not gmail_password:
+                                            raise Exception("Falta configurar GMAIL_ADDRESS o GMAIL_APP_PASSWORD en secrets.toml")
+                                            
+                                        # Armar el correo
+                                        msg = MIMEMultipart()
+                                        msg['From'] = gmail_address
+                                        msg['To'] = reg_email
+                                        msg['Subject'] = "Tu código de verificación de COMUNITAS"
+                                        
+                                        html_content = f"""
+                                        <div style="font-family: sans-serif; text-align: center; padding: 2rem;">
+                                            <h2 style="color: #D36C4F;">¡Bienvenido a COMUNITAS!</h2>
+                                            <p>Para activar tu cuenta, ingresá el siguiente código de verificación:</p>
+                                            <h1 style="background: #FCFBF7; border: 1px solid #EFECE6; padding: 1rem; border-radius: 8px; color: #4C433D; letter-spacing: 5px;">{verification_code}</h1>
+                                            <p style="color: #7E7771; font-size: 0.9rem;">Si no solicitaste este registro, podés ignorar este correo.</p>
+                                        </div>
+                                        """
+                                        msg.attach(MIMEText(html_content, 'html'))
+                                        
+                                        # Enviar usando SMTP de Gmail
+                                        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                                            server.starttls()
+                                            server.login(gmail_address, gmail_password)
+                                            server.send_message(msg)
+                                        
+                                        create_user(reg_email, reg_password, new_user_id, verification_code=verification_code)
+                                        st.session_state['pending_verification_email'] = reg_email
                                         st.session_state['show_register'] = False
-                                    except Exception:
+                                        st.rerun()
+                                    except Exception as e:
                                         supabase_admin.table("users").delete().eq("user_id", new_user_id).execute()
-                                        st.error("Ocurrió un error al guardar credenciales. Por favor intentá de nuevo.")
+                                        st.error(f"Ocurrió un error al guardar credenciales. Detalle técnico: {e}")
                                 except Exception:
                                     st.error("Ocurrió un error al crear la cuenta. Por favor intentá de nuevo.")
             
@@ -582,9 +738,9 @@ if current_user:
             
             # Bloqueo o visualización
             if not has_any_membership:
-                st.warning("No estás vinculado a ninguna organización.\\nSi pertenecés a una, comunicate con el equipo administrador de COMUNITAS para solicitar acceso.")
+                st.warning("No estás vinculado a ninguna organización.\n\nSi pertenecés a una organización, comunicate con ellos para que te agreguen. Si tu organización es nueva y no tiene miembros, contactate con el equipo de COMUNITAS (comunitas.admin@gmail.com).")
             elif len(active_memberships) == 0:
-                st.warning("Tu acceso a esta organización no está activo.\\nSi creés que es un error, comunicate con el equipo administrador de COMUNITAS.")
+                st.warning("Tu acceso a esta organización no está activo.\n\nSi creés que es un error, comunicate con el equipo administrador de COMUNITAS.")
             else:
                 # El usuario tiene membresía activa. Tomamos la primera.
                 my_org_id = active_memberships[0]["org_id"]
@@ -660,5 +816,28 @@ if current_user:
                                             }).execute()
                                             st.success("Miembro agregado correctamente.")
                                             st.rerun()
+
+        with st.expander("🔒 Seguridad (Cambiar Contraseña)", expanded=False):
+            st.markdown("### Cambiar mi contraseña")
+            with st.form("change_password_form"):
+                current_pass = st.text_input("Contraseña actual", type="password")
+                new_pass = st.text_input("Nueva contraseña", type="password")
+                confirm_new_pass = st.text_input("Confirmar nueva contraseña", type="password")
+                submit_pwd = st.form_submit_button("Cambiar Contraseña", type="primary")
+                
+                if submit_pwd:
+                    from database.mongo_client import authenticate_user, update_password
+                    # Verificamos si la actual es correcta
+                    auth_check = authenticate_user(current_user["email"], current_pass)
+                    
+                    if not auth_check:
+                        st.error("La contraseña actual es incorrecta.")
+                    elif len(new_pass) < 6:
+                        st.error("La nueva contraseña debe tener al menos 6 caracteres.")
+                    elif new_pass != confirm_new_pass:
+                        st.error("Las nuevas contraseñas no coinciden.")
+                    else:
+                        update_password(current_user["email"], new_pass)
+                        st.success("¡Contraseña actualizada con éxito!")
 
         components.html(html_content, height=1000, scrolling=True)

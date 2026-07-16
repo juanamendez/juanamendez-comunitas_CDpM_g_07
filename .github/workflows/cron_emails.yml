@@ -1,0 +1,35 @@
+name: Envio de Resumenes Semanales
+
+on:
+  schedule:
+    # Se ejecuta todos los lunes a las 09:00 UTC (06:00 AM Argentina)
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    # Permite ejecutarlo manualmente desde la web de GitHub para probar
+
+jobs:
+  send-newsletters:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out del repositorio
+      uses: actions/checkout@v4
+      
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install supabase
+        
+    - name: Ejecutar script de envios
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+        GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      run: |
+        python enviar_resumenes.py
