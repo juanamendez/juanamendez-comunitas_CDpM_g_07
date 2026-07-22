@@ -3376,13 +3376,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 let currentStatus = 'pending';
-                let currentOrg = window.INJECTED_DATA.organizations_with_rating?.find(o => Number(o.org_id) === 1);
+                const memberships = window.getCurrentUserMemberships();
+                const dynamicOrgId = memberships.length > 0 ? Number(memberships[0].org_id) : 1;
+                
+                let currentOrg = window.INJECTED_DATA.organizations_with_rating?.find(o => Number(o.org_id) === dynamicOrgId);
                 if (currentOrg && currentOrg.status) {
                     currentStatus = currentOrg.status;
                 }
 
                 const payload = {
-                    p_org_id: 1,
+                    p_org_id: dynamicOrgId,
                     p_name: nameVal,
                     p_description: descVal,
                     p_address: addressVal,
@@ -3414,7 +3417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (error) throw error;
 
                     if (window.INJECTED_DATA.organizations_with_rating) {
-                        const org = window.INJECTED_DATA.organizations_with_rating.find(o => Number(o.org_id) === 1);
+                        const org = window.INJECTED_DATA.organizations_with_rating.find(o => Number(o.org_id) === payload.p_org_id);
                         if (org) {
                             org.name = payload.p_name;
                             org.description = payload.p_description;
@@ -3428,16 +3431,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     if (window.INJECTED_DATA.map_organizations) {
-                        const mOrg = window.INJECTED_DATA.map_organizations.find(o => Number(o.org_id) === 1);
+                        const mOrg = window.INJECTED_DATA.map_organizations.find(o => Number(o.org_id) === payload.p_org_id);
                         if (mOrg) Object.assign(mOrg, { name: payload.p_name, latitude: payload.p_latitude, longitude: payload.p_longitude });
                     }
                     if (window.INJECTED_DATA.data) {
-                        const dOrg = window.INJECTED_DATA.data.find(o => Number(o.org_id) === 1);
+                        const dOrg = window.INJECTED_DATA.data.find(o => Number(o.org_id) === payload.p_org_id);
                         if (dOrg) Object.assign(dOrg, { name: payload.p_name, latitude: payload.p_latitude, longitude: payload.p_longitude });
                     }
                     if (window.INJECTED_DATA.services_full) {
                         window.INJECTED_DATA.services_full.forEach(s => {
-                            if (Number(s.org_id) === 1) {
+                            if (Number(s.org_id) === payload.p_org_id) {
                                 s.organization_name = payload.p_name;
                             }
                         });
@@ -3712,7 +3715,8 @@ document.addEventListener('DOMContentLoaded', () => {
         cardsGrid.innerHTML = '';
 
         myOrgServices = [];
-        const myOrgId = 1;
+        const memberships = window.getCurrentUserMemberships();
+        const myOrgId = memberships.length > 0 ? Number(memberships[0].org_id) : 1;
         if (window.INJECTED_DATA.services_full) {
             const orgServices = window.INJECTED_DATA.services_full.filter(s => Number(s.org_id) === myOrgId);
             orgServices.forEach(s => {
@@ -3892,8 +3896,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnManageNeeds) {
             btnManageNeeds.addEventListener('click', () => {
                 myOrgNeeds = [];
+                const memberships = window.getCurrentUserMemberships();
+                const myOrgId = memberships.length > 0 ? Number(memberships[0].org_id) : 1;
+                
                 if (window.INJECTED_DATA && window.INJECTED_DATA.active_needs) {
-                    const orgNeeds = window.INJECTED_DATA.active_needs.filter(n => Number(n.org_id) === 1);
+                    const orgNeeds = window.INJECTED_DATA.active_needs.filter(n => Number(n.org_id) === myOrgId);
                     
                     const priorityLabelMap = {
                         'low': 'Baja',
@@ -3969,8 +3976,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                const memberships = window.getCurrentUserMemberships();
+                const dynamicOrgId = memberships.length > 0 ? Number(memberships[0].org_id) : 1;
+                
                 const payload = {
-                    p_org_id: 1,
+                    p_org_id: dynamicOrgId,
                     p_title: nameVal,
                     p_description: descVal,
                     p_category: categoryVal,
@@ -3996,10 +4006,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const { data: newNeedId, error } = await supabaseClient.rpc('add_need', payload);
                     if (error) throw error;
 
+                    const orgName = window.INJECTED_DATA.organizations_with_rating?.find(o => Number(o.org_id) === payload.p_org_id)?.name || "Mi Organización";
                     const newNeedObj = {
                         need_id: newNeedId,
-                        org_id: 1,
-                        organization_name: "Comedor Esperanza Pilar",
+                        org_id: payload.p_org_id,
+                        organization_name: orgName,
                         title: nameVal,
                         description: descVal,
                         category: categoryVal,
