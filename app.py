@@ -429,6 +429,9 @@ if not st.session_state.get("current_user"):
             reg_email = st.text_input("Email")
             reg_password = st.text_input("Contraseña", type="password")
             reg_confirm = st.text_input("Confirmar contraseña", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            reg_newsletter = st.checkbox("Quiero recibir resúmenes semanales de mis organizaciones favoritas", value=True)
+            st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("Crear cuenta", type="primary", use_container_width=True):
                 import re
@@ -470,7 +473,8 @@ if not st.session_state.get("current_user"):
                                         "full_name": reg_name,
                                         "email": reg_email,
                                         "role": "beneficiary",
-                                        "password_hash": "mongo_auth_only"
+                                        "password_hash": "mongo_auth_only",
+                                        "wants_newsletter": reg_newsletter
                                     }).execute()
                                     
                                     new_user_id = res_insert.data[0]["user_id"]
@@ -842,5 +846,22 @@ if current_user:
                     else:
                         update_password(current_user["email"], new_pass)
                         st.success("¡Contraseña actualizada con éxito!")
+
+        with st.expander("✉️ Preferencias de Correo", expanded=False):
+            st.markdown("### Suscripción a Newsletters")
+            st.write("Recibí un resumen semanal con las novedades de tus organizaciones favoritas.")
+            
+            # Obtener estado actual desde Supabase (bypassing view directly from users table)
+            res_user = supabase_admin.table("users").select("wants_newsletter").eq("user_id", current_uid).single().execute()
+            current_pref = True
+            if res_user and hasattr(res_user, "data") and "wants_newsletter" in res_user.data:
+                current_pref = res_user.data["wants_newsletter"]
+            
+            new_pref = st.toggle("Recibir correos de resumen semanal", value=current_pref)
+            
+            if new_pref != current_pref:
+                supabase_admin.table("users").update({"wants_newsletter": new_pref}).eq("user_id", current_uid).execute()
+                st.success("Tus preferencias de correo fueron actualizadas.")
+                st.rerun()
 
         components.html(html_content, height=1000, scrolling=True)

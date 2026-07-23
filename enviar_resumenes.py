@@ -30,9 +30,9 @@ def send_newsletters():
     # 2. Conectar a Supabase
     supabase: Client = create_client(supabase_url, supabase_key)
 
-    # 3. Obtener a todos los usuarios
-    print("Obteniendo usuarios...")
-    res_users = supabase.table("users").select("user_id, email, full_name").execute()
+    # 3. Obtener a los usuarios suscritos al newsletter
+    print("Obteniendo usuarios suscritos...")
+    res_users = supabase.table("users").select("user_id, email, full_name").eq("wants_newsletter", True).execute()
     if not res_users.data:
         print("No hay usuarios registrados.")
         return
